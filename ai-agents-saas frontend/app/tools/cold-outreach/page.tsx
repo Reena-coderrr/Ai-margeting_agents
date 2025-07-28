@@ -239,6 +239,99 @@ Best,
     setTimeout(() => setCopied((prev) => ({ ...prev, [id]: false })), 2000)
   }
 
+  const exportToCRM = () => {
+    if (!result) return
+
+    // Create comprehensive CRM export data
+    const crmData = {
+      campaign: {
+        name: `Cold Outreach - ${formData.targetRole} in ${formData.industry}`,
+        targetRole: formData.targetRole,
+        industry: formData.industry,
+        companySize: formData.companySize,
+        painPoint: formData.painPoint,
+        valueProposition: formData.valueProposition,
+        createdDate: new Date().toISOString(),
+      },
+      sequences: result.sequences.map(seq => ({
+        emailNumber: seq.emailNumber,
+        subject: seq.subject,
+        content: seq.content,
+        timing: seq.timing,
+        purpose: seq.purpose,
+        followUpTrigger: seq.followUpTrigger,
+      })),
+      analytics: {
+        expectedOpenRate: result.analytics.expectedOpenRate,
+        expectedResponseRate: result.analytics.expectedResponseRate,
+        expectedConversionRate: result.analytics.expectedConversionRate,
+        bestSendTimes: result.analytics.bestSendTimes,
+      },
+      templates: {
+        linkedin: result.templates.linkedin,
+        twitter: result.templates.twitter,
+        phone: result.templates.phone,
+      },
+      optimization: {
+        subjectLineVariations: result.optimization.subjectLineVariations,
+        abtestingSuggestions: result.optimization.abtestingSuggestions,
+        followUpStrategy: result.optimization.followUpStrategy,
+      },
+      personalization: {
+        researchPoints: result.personalization.researchPoints,
+        customizationTips: result.personalization.customizationTips,
+        industryInsights: result.personalization.industryInsights,
+      }
+    }
+
+    // Create and download JSON file
+    const dataStr = JSON.stringify(crmData, null, 2)
+    const dataBlob = new Blob([dataStr], { type: 'application/json' })
+    const url = URL.createObjectURL(dataBlob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `cold-outreach-campaign-${formData.targetRole}-${formData.industry}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    // Also create a CSV version for better CRM compatibility
+    const csvData = createCSVExport(crmData)
+    const csvBlob = new Blob([csvData], { type: 'text/csv' })
+    const csvUrl = URL.createObjectURL(csvBlob)
+    const csvLink = document.createElement('a')
+    csvLink.href = csvUrl
+    csvLink.download = `cold-outreach-campaign-${formData.targetRole}-${formData.industry}.csv`
+    document.body.appendChild(csvLink)
+    csvLink.click()
+    document.body.removeChild(csvLink)
+    URL.revokeObjectURL(csvUrl)
+  }
+
+  const createCSVExport = (data: any) => {
+    let csv = 'Campaign Name,Target Role,Industry,Company Size,Pain Point,Value Proposition,Email Number,Subject,Content,Timing,Purpose\n'
+    
+    data.sequences.forEach((seq: any) => {
+      const row = [
+        data.campaign.name,
+        data.campaign.targetRole,
+        data.campaign.industry,
+        data.campaign.companySize,
+        data.campaign.painPoint,
+        data.campaign.valueProposition,
+        seq.emailNumber,
+        `"${seq.subject.replace(/"/g, '""')}"`,
+        `"${seq.content.replace(/"/g, '""')}"`,
+        seq.timing,
+        seq.purpose
+      ].join(',')
+      csv += row + '\n'
+    })
+    
+    return csv
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -712,7 +805,12 @@ Best,
                     )}
                     {copied["all-outreach"] ? "Copied!" : "Copy All Templates"}
                   </Button>
-                  <Button variant="outline" className="flex-1 bg-transparent">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 bg-transparent"
+                    onClick={exportToCRM}
+                    disabled={!result}
+                  >
                     <Download className="w-4 h-4 mr-2" />
                     Export to CRM
                   </Button>

@@ -95,6 +95,7 @@ export default function LocalSEOPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [result, setResult] = useState<LocalSEOResult | null>(null)
   const [copied, setCopied] = useState<{ [key: string]: boolean }>({})
+  const [isExportingPDF, setIsExportingPDF] = useState(false)
 
   const hasAccess = user.plan !== "Free Trial"
 
@@ -481,28 +482,160 @@ The ${formData.businessName} Team`,
 
   const handleDownloadPDF = () => {
     if (!result) return;
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text("Local SEO Plan", 10, 15);
-    doc.setFontSize(12);
-    if (result.actionPlan && Array.isArray(result.actionPlan)) {
-      result.actionPlan.forEach((phase, i) => {
-        doc.text(`${phase.phase}:`, 10, 25 + i * 30);
-        if (phase.tasks && Array.isArray(phase.tasks)) {
-          doc.text("Tasks:", 12, 32 + i * 30);
-          phase.tasks.forEach((task, j) => {
-            doc.text(`- ${task}`, 14, 38 + i * 30 + j * 6);
-          });
-        }
-        if (phase.expectedResults && Array.isArray(phase.expectedResults)) {
-          doc.text("Expected Results:", 80, 32 + i * 30);
-          phase.expectedResults.forEach((res, k) => {
-            doc.text(`- ${res}`, 82, 38 + i * 30 + k * 6);
-          });
-        }
-      });
+    
+    // Validate required data
+    if (!result.businessProfile || !result.actionPlan || result.actionPlan.length === 0) {
+      alert('No data available to export. Please generate a Local SEO plan first.');
+      return;
     }
-    doc.save("local-seo-plan.pdf");
+    
+    setIsExportingPDF(true);
+
+    try {
+      const doc = new jsPDF();
+      let yPosition = 20;
+      
+      // Title
+      doc.setFontSize(20);
+      doc.setFont(undefined, 'bold');
+      doc.text("Local SEO Plan", 20, yPosition);
+      yPosition += 15;
+      
+      // Business Info
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Business: ${formData.businessName || 'N/A'}`, 20, yPosition);
+      yPosition += 8;
+      doc.text(`Location: ${formData.location || 'N/A'}`, 20, yPosition);
+      yPosition += 8;
+      doc.text(`Business Type: ${formData.businessType || 'N/A'}`, 20, yPosition);
+      yPosition += 15;
+      
+      // Business Profile Score
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text("Business Profile Optimization", 20, yPosition);
+      yPosition += 10;
+      
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Optimization Score: ${result.businessProfile?.optimizationScore || 0}/100`, 25, yPosition);
+      yPosition += 8;
+      
+      // Issues
+      if (result.businessProfile?.issues && result.businessProfile.issues.length > 0) {
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text("Critical Issues:", 25, yPosition);
+        yPosition += 8;
+        
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        result.businessProfile.issues.forEach((issue, index) => {
+          const issueText = `${issue.priority} Priority: ${issue.issue}`;
+          const lines = doc.splitTextToSize(issueText, 170);
+          lines.forEach(line => {
+            doc.text(line, 30, yPosition);
+            yPosition += 5;
+          });
+          yPosition += 3;
+        });
+        yPosition += 10;
+      }
+      
+      // Action Plan
+      doc.setFontSize(16);
+      doc.setFont(undefined, 'bold');
+      doc.text("90-Day Action Plan", 20, yPosition);
+      yPosition += 12;
+      
+      result.actionPlan.forEach((phase, index) => {
+        // Check if we need a new page
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        
+        // Phase Title
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.text(`${phase.phase}`, 20, yPosition);
+        yPosition += 8;
+        
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Timeline: ${phase.timeline}`, 25, yPosition);
+        yPosition += 8;
+        
+        // Tasks
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.text("Tasks:", 25, yPosition);
+        yPosition += 6;
+        
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        phase.tasks.forEach((task, taskIndex) => {
+          const lines = doc.splitTextToSize(`• ${task}`, 70);
+          lines.forEach(line => {
+            doc.text(line, 30, yPosition);
+            yPosition += 5;
+          });
+          yPosition += 2;
+        });
+        yPosition += 5;
+        
+        // Expected Results
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.text("Expected Results:", 110, yPosition - (phase.tasks.length * 7 + 5));
+        yPosition = yPosition - (phase.tasks.length * 7 + 5) + 6;
+        
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        phase.expectedResults.forEach((result, resultIndex) => {
+          const lines = doc.splitTextToSize(`• ${result}`, 70);
+          lines.forEach(line => {
+            doc.text(line, 115, yPosition);
+            yPosition += 5;
+          });
+          yPosition += 2;
+        });
+        yPosition += 10;
+      });
+      
+      // Add recommendations page
+      doc.addPage();
+      yPosition = 20;
+      
+      doc.setFontSize(16);
+      doc.setFont(undefined, 'bold');
+      doc.text("Recommendations", 20, yPosition);
+      yPosition += 12;
+      
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'normal');
+      if (result.businessProfile?.recommendations && result.businessProfile.recommendations.length > 0) {
+        result.businessProfile.recommendations.forEach((rec, index) => {
+          const lines = doc.splitTextToSize(`${index + 1}. ${rec}`, 170);
+          lines.forEach(line => {
+            doc.text(line, 20, yPosition);
+            yPosition += 5;
+          });
+          yPosition += 3;
+        });
+      } else {
+        doc.text("No recommendations available.", 20, yPosition);
+      }
+      
+      doc.save("local-seo-plan.pdf");
+      alert('PDF exported successfully!');
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsExportingPDF(false);
+    }
   };
 
   return (
@@ -1099,11 +1232,12 @@ The ${formData.businessName} Team`,
                 </Card>
 
                 {/* Action Buttons */}
-                <div className="flex gap-4">
+                <div className="flex flex-col sm:flex-row gap-4 mt-6">
                   <Button
                     variant="outline"
                     onClick={() => copyToClipboard(JSON.stringify(result, null, 2), "all-local-seo")}
-                    className="flex-1"
+                    className="flex-1 bg-transparent"
+                    disabled={!result}
                   >
                     {copied["all-local-seo"] ? (
                       <CheckCircle className="w-4 h-4 mr-2" />
@@ -1112,9 +1246,18 @@ The ${formData.businessName} Team`,
                     )}
                     {copied["all-local-seo"] ? "Copied!" : "Copy Full Report"}
                   </Button>
-                  <Button variant="outline" onClick={handleDownloadPDF} className="flex-1">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export SEO Plan
+                  <Button 
+                    variant="outline" 
+                    onClick={handleDownloadPDF} 
+                    className="flex-1 bg-transparent"
+                    disabled={!result || isExportingPDF}
+                  >
+                    {isExportingPDF ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4 mr-2" />
+                    )}
+                    {isExportingPDF ? "Exporting..." : "Export SEO Plan"}
                   </Button>
                 </div>
               </div>

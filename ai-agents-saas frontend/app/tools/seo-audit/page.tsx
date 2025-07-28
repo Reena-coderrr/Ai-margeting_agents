@@ -60,40 +60,26 @@ type TechnicalSEO = {
   metaDescription: TestResult
   headingStructure: TestResult
   images: TestResult
-  internalLinks: TestResult
-  canonicalTags: TestResult
-  schemaMarkup: TestResult
-  robotsTxt: TestResult
-  sitemap: TestResult
 }
 
 type Performance = {
   pageSpeed: TestResult
-  coreWebVitals: TestResult
-  compression: TestResult
 }
 
 type Security = {
   https: TestResult
-  securityHeaders: TestResult
 }
 
 type MobileUsability = {
   responsiveDesign: TestResult
-  touchTargets: TestResult
-  mobileSpeed: TestResult
 }
 
 type ContentQuality = {
   readability: TestResult
-  keywordOptimization: TestResult
-  contentUniqueness: TestResult
 }
 
 type Accessibility = {
   altText: TestResult
-  ariaLabels: TestResult
-  navigation: TestResult
 }
 
 type URLStructure = {
@@ -134,14 +120,15 @@ type SEOResult = {
 }
 
 export default function SEOAuditPage() {
-  const [formData, setFormData] = useState<{ url: string }>({
-    url: "",
+  const [formData, setFormData] = useState({
+    url: ""
   })
-  const [isGenerating, setIsGenerating] = useState(false)
   const [result, setResult] = useState<SEOResult | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [userPlan, setUserPlan] = useState<string | null>(null);
-  const router = useRouter();
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+  const userPlan = "free_trial" // This should come from your auth context
 
   useEffect(() => {
     const user = localStorage.getItem("user");
@@ -152,7 +139,7 @@ export default function SEOAuditPage() {
         if (plan) {
           plan = plan.toLowerCase().replace(/\s+/g, "_");
         }
-        setUserPlan(plan);
+        // setUserPlan(plan); // This line was removed as per the new_code
       } catch {}
     }
   }, []);
@@ -163,49 +150,40 @@ export default function SEOAuditPage() {
 
   const handleGenerate = async () => {
     if (!formData.url) {
-      alert("Please enter a website URL")
-      return
+      alert('Please enter a website URL');
+      return;
     }
 
-    setIsGenerating(true)
-    const token = localStorage.getItem("authToken")
-    
+    setIsGenerating(true);
+    setResult(null);
+    setError(null);
+
     try {
-      const res = await fetch("http://localhost:5000/api/ai-tools/seo-audit/generate", {
-        method: "POST",
+      // Call the simplified SEO audit endpoint
+      const response = await fetch('http://localhost:5000/api/ai-tools/seo-audit', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ input: formData }),
-      })
-      const data = await res.json()
-      
-      if (res.ok) {
-        if (data.output && data.output.error) {
-          alert(`SEO Audit failed: ${data.output.error}`)
-          return
-        }
-        
-        if (data.output && typeof data.output.overallScore === 'number') {
-          console.log('Setting SEO audit result:', data.output);
-          setResult(data.output)
-        } else if (data.output && data.output.error) {
-          alert(`SEO Audit failed: ${data.output.error}`)
-        } else {
-          console.log('Invalid SEO audit data received:', data);
-          alert("Invalid SEO audit data received. Please try again.")
-        }
+        body: JSON.stringify({
+          input: formData
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        setError(data.error);
       } else {
-        alert(data.message || "Failed to generate SEO audit")
+        setResult(data.output || data);
       }
     } catch (error) {
-      console.error("SEO Audit error:", error)
-      alert("Network error. Please check your connection and try again.")
+      console.error('Error:', error);
+      setError('Failed to generate SEO audit. Please try again.');
     } finally {
-      setIsGenerating(false)
+      setIsGenerating(false);
     }
-  }
+  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -263,7 +241,7 @@ export default function SEOAuditPage() {
       yPosition += 10;
       
       Object.entries(result.technicalSEO).forEach(([key, test]) => {
-        if (typeof test === 'object' && test !== null) {
+        if (typeof test === 'object' && test !== null && test.status && test.description) {
           doc.setFontSize(11);
           doc.setFont(undefined, 'bold');
           doc.text(`${key.replace(/([A-Z])/g, ' $1').trim()}: ${test.status.toUpperCase()}`, 25, yPosition);
@@ -286,7 +264,7 @@ export default function SEOAuditPage() {
       yPosition += 10;
       
       Object.entries(result.performance).forEach(([key, test]) => {
-        if (typeof test === 'object' && test !== null) {
+        if (typeof test === 'object' && test !== null && test.status) {
           doc.setFontSize(11);
           doc.setFont(undefined, 'bold');
           doc.text(`${key.replace(/([A-Z])/g, ' $1').trim()}: ${test.status.toUpperCase()}`, 25, yPosition);
@@ -309,7 +287,7 @@ export default function SEOAuditPage() {
       yPosition += 10;
       
       Object.entries(result.security).forEach(([key, test]) => {
-        if (typeof test === 'object' && test !== null) {
+        if (typeof test === 'object' && test !== null && test.status) {
           doc.setFontSize(11);
           doc.setFont(undefined, 'bold');
           doc.text(`${key.replace(/([A-Z])/g, ' $1').trim()}: ${test.status.toUpperCase()}`, 25, yPosition);
@@ -378,7 +356,7 @@ export default function SEOAuditPage() {
       yPosition += 10;
       
       Object.entries(result.accessibility).forEach(([key, test]) => {
-        if (typeof test === 'object' && test !== null) {
+        if (typeof test === 'object' && test !== null && test.status) {
           doc.setFontSize(11);
           doc.setFont(undefined, 'bold');
           doc.text(`${key.replace(/([A-Z])/g, ' $1').trim()}: ${test.status.toUpperCase()}`, 25, yPosition);
@@ -491,7 +469,9 @@ export default function SEOAuditPage() {
     }
   }
 
-  const getStatusColor = (status: TestStatus) => {
+  const getStatusColor = (status: TestStatus | undefined) => {
+    if (!status) return "text-gray-600";
+    
     switch (status) {
       case "pass":
         return "text-green-600"
@@ -570,49 +550,65 @@ export default function SEOAuditPage() {
           </Card>
 
           {/* Results */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Audit Results</CardTitle>
-              <CardDescription>Your comprehensive SEO analysis report</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!result ? (
-                <div className="text-center py-12 text-gray-500">
-                  <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Enter your website URL and click "Start SEO Audit"</p>
+          {isGenerating && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-12">
+                  <Loader2 className="w-12 h-12 mx-auto mb-4 animate-spin text-green-600" />
+                  <h3 className="text-lg font-semibold mb-2">Analyzing Website...</h3>
+                  <p className="text-gray-600">Crawling website and generating comprehensive SEO report</p>
                 </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Overall Score */}
-                  <div className="text-center p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg">
-                    <div className="text-4xl font-bold text-green-600 mb-2">{result.overallScore}/100</div>
-                    <div className="text-gray-600">Overall SEO Score</div>
-                    <Progress value={result.overallScore} className="mt-3" />
-                  </div>
+              </CardContent>
+            </Card>
+          )}
 
-                  {/* Summary Stats */}
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-red-500">{result.summary?.failed || 0}</div>
-                      <div className="text-xs text-gray-500">Failed</div>
+          {result && !isGenerating && (
+            <div className="space-y-6">
+              {/* Error Display */}
+              {error && (
+                <Card className="border-red-200 bg-red-50">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2 text-red-700">
+                      <AlertTriangle className="w-5 h-5" />
+                      <span className="font-medium">Analysis Warning</span>
                     </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-yellow-500">{result.summary?.warnings || 0}</div>
-                      <div className="text-xs text-gray-500">Warnings</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-500">{result.summary?.passed || 0}</div>
-                      <div className="text-xs text-gray-500">Passed</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-500">{result.summary?.score || 0}</div>
-                      <div className="text-xs text-gray-500">Score</div>
-                    </div>
+                    <p className="text-red-600 mt-2">{error}</p>
+                    <p className="text-red-500 text-sm mt-1">
+                      Showing fallback analysis based on available data.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Overall Score */}
+              <div className="text-center p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg">
+                <div className="text-4xl font-bold text-gray-900 mb-2">
+                  {result.overallScore}/100
+                </div>
+                <div className="text-sm text-gray-600 mb-4">Overall SEO Score</div>
+                
+                {/* Summary Stats */}
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-red-500">{result.summary?.failed || 0}</div>
+                    <div className="text-xs text-gray-500">Failed</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-yellow-500">{result.summary?.warnings || 0}</div>
+                    <div className="text-xs text-gray-500">Warnings</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-500">{result.summary?.passed || 0}</div>
+                    <div className="text-xs text-gray-500">Passed</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-500">{result.summary?.score || 0}</div>
+                    <div className="text-xs text-gray-500">Score</div>
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Detailed Results */}

@@ -69,7 +69,7 @@ export default function ProductLaunchPage() {
   const [result, setResult] = useState<LaunchResult | null>(null)
   const [copied, setCopied] = useState<{ [key: string]: boolean }>({})
 
-  const hasAccess = user.plan === "Agency"
+  const hasAccess = user.plan === "Agency" || user.plan === "agency"
 
   const handleInputChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }))

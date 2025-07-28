@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Globe, Zap, Copy, Download, Sparkles, Target, TrendingUp, AlertTriangle } from "lucide-react"
+import { Globe, Zap, Copy, Download, Sparkles, Target, TrendingUp, AlertTriangle, ArrowLeft } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import Link from "next/link"
 
 export default function LandingPageOptimizerPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -223,16 +224,28 @@ export default function LandingPageOptimizerPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Landing Page Optimizer</h1>
-        <p className="text-muted-foreground">Analyze and optimize your landing pages for maximum conversions</p>
-        <Alert className="mt-4">
-          <Zap className="h-4 w-4" />
-          <AlertDescription>
-            <strong>Pro Feature:</strong> This tool requires a Pro or Agency plan for full access.
-          </AlertDescription>
-        </Alert>
+      <div className="flex items-center gap-4 mb-8">
+        <Link href="/tools" className="inline-flex items-center bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg px-4 py-2 font-medium transition-colors">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Tools
+        </Link>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-orange-400 to-red-600 flex items-center justify-center">
+            <Globe className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Landing Page Optimizer</h1>
+            <p className="text-gray-600">Analyze and optimize your landing pages for maximum conversions</p>
+          </div>
+        </div>
       </div>
+      
+      <Alert className="mb-8">
+        <Zap className="h-4 w-4" />
+        <AlertDescription>
+          <strong>Pro Feature:</strong> This tool requires a Pro or Agency plan for full access.
+        </AlertDescription>
+      </Alert>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">

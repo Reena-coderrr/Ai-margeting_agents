@@ -284,6 +284,141 @@ CTA (55-60s):
     setTimeout(() => setCopied((prev) => ({ ...prev, [id]: false })), 2000)
   }
 
+  const exportScriptPackage = () => {
+    if (!result) return
+
+    // Create comprehensive script package data
+    const scriptPackage = {
+      campaign: {
+        name: `Reels Script - ${formData.topic} for ${formData.targetAudience}`,
+        topic: formData.topic,
+        niche: formData.niche,
+        targetAudience: formData.targetAudience,
+        contentType: formData.contentType,
+        duration: formData.duration,
+        goal: formData.goal,
+        tone: formData.tone,
+        createdDate: new Date().toISOString(),
+      },
+      scripts: result.scripts.map(script => ({
+        platform: script.platform,
+        hook: script.hook,
+        content: script.content,
+        cta: script.cta,
+        hashtags: script.hashtags,
+        duration: script.duration,
+        engagement: script.engagement,
+      })),
+      hooks: result.hooks.map(hook => ({
+        category: hook.category,
+        examples: hook.examples,
+      })),
+      trends: {
+        trending: result.trends.trending,
+        sounds: result.trends.sounds,
+        effects: result.trends.effects,
+      },
+      optimization: {
+        bestTimes: result.optimization.bestTimes,
+        captionTips: result.optimization.captionTips,
+        engagementTactics: result.optimization.engagementTactics,
+      }
+    }
+
+    // Create and download JSON file
+    const dataStr = JSON.stringify(scriptPackage, null, 2)
+    const dataBlob = new Blob([dataStr], { type: 'application/json' })
+    const url = URL.createObjectURL(dataBlob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `reels-script-package-${formData.topic}-${formData.targetAudience}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    // Also create a TXT version for easy reading
+    const txtData = createTXTExport(scriptPackage)
+    const txtBlob = new Blob([txtData], { type: 'text/plain' })
+    const txtUrl = URL.createObjectURL(txtBlob)
+    const txtLink = document.createElement('a')
+    txtLink.href = txtUrl
+    txtLink.download = `reels-script-package-${formData.topic}-${formData.targetAudience}.txt`
+    document.body.appendChild(txtLink)
+    txtLink.click()
+    document.body.removeChild(txtLink)
+    URL.revokeObjectURL(txtUrl)
+  }
+
+  const createTXTExport = (data: any) => {
+    let txt = `REELS SCRIPT PACKAGE\n`
+    txt += `========================\n\n`
+    txt += `Campaign: ${data.campaign.name}\n`
+    txt += `Topic: ${data.campaign.topic}\n`
+    txt += `Niche: ${data.campaign.niche}\n`
+    txt += `Target Audience: ${data.campaign.targetAudience}\n`
+    txt += `Content Type: ${data.campaign.contentType}\n`
+    txt += `Duration: ${data.campaign.duration}\n`
+    txt += `Created: ${new Date(data.campaign.createdDate).toLocaleDateString()}\n\n`
+    
+    txt += `SCRIPTS\n`
+    txt += `=======\n\n`
+    
+    data.scripts.forEach((script: any, index: number) => {
+      txt += `${index + 1}. ${script.platform}\n`
+      txt += `Duration: ${script.duration}\n`
+      txt += `Engagement: ${script.engagement}\n\n`
+      txt += `HOOK:\n${script.hook}\n\n`
+      txt += `CONTENT:\n${script.content}\n\n`
+      txt += `CALL TO ACTION:\n${script.cta}\n\n`
+      txt += `HASHTAGS:\n${script.hashtags.join(' ')}\n\n`
+      txt += `---\n\n`
+    })
+    
+    txt += `OPTIMIZATION TIPS\n`
+    txt += `=================\n\n`
+    
+    txt += `Best Posting Times:\n`
+    data.optimization.bestTimes.forEach((time: string) => {
+      txt += `• ${time}\n`
+    })
+    txt += `\n`
+    
+    txt += `Caption Tips:\n`
+    data.optimization.captionTips.forEach((tip: string) => {
+      txt += `• ${tip}\n`
+    })
+    txt += `\n`
+    
+    txt += `Engagement Tactics:\n`
+    data.optimization.engagementTactics.forEach((tactic: string) => {
+      txt += `• ${tactic}\n`
+    })
+    txt += `\n`
+    
+    txt += `TRENDING ELEMENTS\n`
+    txt += `==================\n\n`
+    
+    txt += `Trending Hashtags:\n`
+    data.trends.trending.forEach((trend: string) => {
+      txt += `• ${trend}\n`
+    })
+    txt += `\n`
+    
+    txt += `Popular Sounds:\n`
+    data.trends.sounds.forEach((sound: string) => {
+      txt += `• ${sound}\n`
+    })
+    txt += `\n`
+    
+    txt += `Visual Effects:\n`
+    data.trends.effects.forEach((effect: string) => {
+      txt += `• ${effect}\n`
+    })
+    
+    return txt
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -719,7 +854,12 @@ CTA (55-60s):
                     )}
                     {copied["all-scripts"] ? "Copied!" : "Copy All Scripts"}
                   </Button>
-                  <Button variant="outline" className="flex-1 bg-transparent">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 bg-transparent"
+                    onClick={exportScriptPackage}
+                    disabled={!result}
+                  >
                     <Download className="w-4 h-4 mr-2" />
                     Export Script Package
                   </Button>
