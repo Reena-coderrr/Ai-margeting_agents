@@ -160,4 +160,108 @@ router.put("/settings", adminAuth, async (req, res) => {
   }
 });
 
+// Get user details
+router.get("/users/:userId", adminAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching user details", error });
+  }
+});
+
+// Update user
+router.put("/users/:userId", adminAuth, async (req, res) => {
+  try {
+    console.log('Update user request:', req.params.userId, req.body);
+    console.log('Admin auth passed, user ID:', req.user.id);
+    
+    const { firstName, lastName, email, company, subscription } = req.body;
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      console.log('User not found:', req.params.userId);
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    console.log('Found user:', user.email);
+    console.log('Updating with data:', { firstName, lastName, email, company, subscription });
+    
+    // Update user fields
+    if (firstName) user.firstName = firstName;
+    if (lastName) user.lastName = lastName;
+    if (email) user.email = email;
+    if (company !== undefined) user.company = company;
+    
+    await user.save();
+    console.log('User saved successfully');
+    
+    // Update subscription if provided
+    if (subscription && (subscription.plan || subscription.status)) {
+      console.log('Updating subscription:', subscription);
+      await Subscription.findOneAndUpdate(
+        { userId: user._id },
+        subscription,
+        { new: true, upsert: true }
+      );
+      console.log('Subscription updated successfully');
+    }
+    
+    // Return updated user data
+    const updatedUser = await User.findById(req.params.userId).select("-password");
+    console.log('Returning updated user:', updatedUser.email);
+    res.json({ message: "User updated successfully", user: updatedUser });
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({ message: "Error updating user", error: error.message });
+  }
+});
+
+// Suspend/Unsuspend user account
+router.post("/users/:userId/toggle-suspension", adminAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    // Toggle suspension status
+    user.isSuspended = !user.isSuspended;
+    await user.save();
+    
+    const action = user.isSuspended ? "suspended" : "activated";
+    res.json({ 
+      message: `User account ${action} successfully`,
+      isSuspended: user.isSuspended
+    });
+  } catch (error) {
+    console.error('Toggle suspension error:', error);
+    res.status(500).json({ message: "Error updating user suspension status", error: error.message });
+  }
+});
+
+// Delete user account
+router.delete("/users/:userId", adminAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    // Delete user and related data
+    await User.findByIdAndDelete(req.params.userId);
+    await Subscription.findOneAndDelete({ userId: req.params.userId });
+    await AIToolUsage.deleteMany({ userId: req.params.userId });
+    
+    res.json({ 
+      message: "User account deleted successfully"
+    });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ message: "Error deleting user account", error: error.message });
+  }
+});
+
 module.exports = router;

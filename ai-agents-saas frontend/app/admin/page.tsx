@@ -6,13 +6,16 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, DollarSign, TrendingUp, Activity, Search, Filter, MoreHorizontal, Crown } from "lucide-react"
+import { Users, DollarSign, TrendingUp, Activity, Search, Filter, MoreHorizontal, Crown, Eye, Edit, Ban, CheckCircle, X } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select } from "@/components/ui/select";
 import { useRouter } from "next/navigation";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { useToast } from "@/components/ui/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 type User = {
   _id: string;
@@ -20,6 +23,7 @@ type User = {
   lastName: string;
   email: string;
   company?: string;
+  isSuspended?: boolean;
   subscription?: {
     plan: string;
     status: string;
@@ -63,6 +67,22 @@ export default function AdminPage() {
   const [settings, setSettings] = useState<any>(null);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
+  
+  // User management states
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [showViewDetails, setShowViewDetails] = useState(false);
+  const [showEditUser, setShowEditUser] = useState(false);
+  const [showSuspendAccount, setShowSuspendAccount] = useState(false);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [editUserData, setEditUserData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    company: "",
+    plan: "",
+    status: ""
+  });
+  const [loadingAction, setLoadingAction] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -163,25 +183,181 @@ export default function AdminPage() {
   }
 
   function getLastActive(user: User) {
-    const lastLogin = user.lastLogin ? new Date(user.lastLogin) : null;
-    const lastToolUsed = user.usage?.toolsUsed?.length
-      ? new Date(
-          Math.max(
-            ...user.usage.toolsUsed
-              .filter(t => t.lastUsed)
-              .map(t => new Date(t.lastUsed).getTime())
-          )
-        )
-      : null;
-
-    const mostRecent = [lastLogin, lastToolUsed]
-      .filter(Boolean)
-      .sort((a, b) => (b as Date).getTime() - (a as Date).getTime())[0];
-
-    return mostRecent
-      ? mostRecent.toLocaleString()
-      : "Never";
+    if (user.lastActive) {
+      return new Date(user.lastActive).toLocaleString();
+    }
+    if (user.lastLogin) {
+      return new Date(user.lastLogin).toLocaleString();
+    }
+    return "Never";
   }
+
+  // User management functions
+  const handleViewDetails = async (user: User) => {
+    setSelectedUser(user);
+    setShowViewDetails(true);
+  };
+
+  const handleEditUser = (user: User) => {
+    console.log('Editing user:', user);
+    setSelectedUser(user);
+    setEditUserData({
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      email: user.email || "",
+      company: user.company || "",
+      plan: user.subscription?.plan || "",
+      status: user.subscription?.status || ""
+    });
+    setShowEditUser(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditUser(false);
+    setEditUserData({
+      firstName: "",
+      lastName: "",
+      email: "",
+      company: "",
+      plan: "",
+      status: ""
+    });
+  };
+
+  const handleSuspendAccount = async (user: User) => {
+    setSelectedUser(user);
+    setShowSuspendAccount(true);
+  };
+
+  const handleDeleteAccount = async (user: User) => {
+    setSelectedUser(user);
+    setShowDeleteAccount(true);
+  };
+
+  const confirmSuspendAccount = async () => {
+    if (!selectedUser) return;
+    
+    setLoadingAction(true);
+    try {
+      const response = await fetch(`http://localhost:5000/api/admin/users/${selectedUser._id}/toggle-suspension`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        toast({ title: "Success", description: result.message });
+        setShowSuspendAccount(false);
+        // Refresh users list
+        const usersRes = await fetch("http://localhost:5000/api/admin/users");
+        const updatedUsers = await usersRes.json();
+        setUsers(updatedUsers);
+      } else {
+        const error = await response.json();
+        console.error('Suspend account error:', error);
+        toast({ title: "Error", description: error.message || "Failed to update account status", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error('Suspend account error:', error);
+      toast({ title: "Error", description: "Failed to update account status", variant: "destructive" });
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const confirmDeleteAccount = async () => {
+    if (!selectedUser) return;
+
+    setLoadingAction(true);
+    try {
+      const response = await fetch(`http://localhost:5000/api/admin/users/${selectedUser._id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        toast({ title: "Success", description: result.message });
+        setShowDeleteAccount(false);
+        // Refresh users list
+        const usersRes = await fetch("http://localhost:5000/api/admin/users");
+        const updatedUsers = await usersRes.json();
+        setUsers(updatedUsers);
+      } else {
+        const error = await response.json();
+        console.error('Delete account error:', error);
+        toast({ title: "Error", description: error.message || "Failed to delete account", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error('Delete account error:', error);
+      toast({ title: "Error", description: "Failed to delete account", variant: "destructive" });
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const handleSaveEditUser = async () => {
+    if (!selectedUser) return;
+    
+    // Validate required fields
+    if (!editUserData.firstName || !editUserData.lastName || !editUserData.email) {
+      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
+      return;
+    }
+    
+    setLoadingAction(true);
+    try {
+      console.log('Sending edit data:', editUserData);
+      
+      const response = await fetch(`http://localhost:5000/api/admin/users/${selectedUser._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify({
+          firstName: editUserData.firstName,
+          lastName: editUserData.lastName,
+          email: editUserData.email,
+          company: editUserData.company,
+          subscription: {
+            plan: editUserData.plan,
+            status: editUserData.status
+          }
+        })
+      });
+      
+      console.log('Response status:', response.status);
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Update result:', result);
+        toast({ title: "Success", description: "User updated successfully" });
+        handleCloseEditModal();
+        
+        // Refresh users list
+        const usersRes = await fetch("http://localhost:5000/api/admin/users");
+        const updatedUsers = await usersRes.json();
+        setUsers(updatedUsers);
+        
+      } else {
+        const error = await response.json();
+        console.error('Update error:', error);
+        toast({ title: "Error", description: error.message || "Failed to update user", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error('Update error:', error);
+      toast({ title: "Error", description: "Failed to update user", variant: "destructive" });
+    } finally {
+      setLoadingAction(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -362,6 +538,9 @@ export default function AdminPage() {
                           <div>
                             <div className="font-medium">{user.firstName} {user.lastName}</div>
                             <div className="text-sm text-gray-500">{user.email}</div>
+                            {user.isSuspended && (
+                              <Badge variant="destructive" className="mt-1 text-xs">Suspended</Badge>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>{user.company}</TableCell>
@@ -383,10 +562,30 @@ export default function AdminPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>View Details</DropdownMenuItem>
-                              <DropdownMenuItem>Edit User</DropdownMenuItem>
-                              <DropdownMenuItem>Reset Password</DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600">Suspend Account</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleViewDetails(user)}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditUser(user)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit User
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => handleSuspendAccount(user)}
+                                className="text-red-600"
+                                disabled={loadingAction}
+                              >
+                                <Ban className="w-4 h-4 mr-2" />
+                                {loadingAction ? "Processing..." : (user.isSuspended ? "Activate Account" : "Suspend Account")}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => handleDeleteAccount(user)}
+                                className="text-red-600"
+                                disabled={loadingAction}
+                              >
+                                <X className="w-4 h-4 mr-2" />
+                                {loadingAction ? "Processing..." : "Delete Account"}
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -406,7 +605,7 @@ export default function AdminPage() {
                   <CardDescription>Current subscription distribution</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {Object.entries(subscriptions).map(([plan, count]) => {
+                  {Object.entries(subscriptions).map(([plan, count]: [string, any]) => {
                     const total = Object.values(subscriptions).reduce((a, b) => (typeof a === 'number' && typeof b === 'number' ? a + b : 0), 0);
                     const percent = total > 0 ? Math.round((count / total) * 100) : 0;
                     const planColors: Record<string, string> = {
@@ -840,7 +1039,7 @@ export default function AdminPage() {
                         <div>
                           <h4 className="font-semibold">Usage Limits</h4>
                           <div className="flex flex-col gap-2 max-w-md">
-                            {Object.entries(settings?.aiTools?.usageLimits || {}).map(([plan, limit]: [string, number]) => (
+                            {Object.entries(settings?.aiTools?.usageLimits || {}).map(([plan, limit]: [string, any]) => (
                               <div key={plan} className="flex items-center gap-2">
                                 <label className="text-sm font-medium capitalize">{plan.replace("_", " ")}</label>
                                 <input
@@ -904,6 +1103,228 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* User Management Modals */}
+        
+        {/* View Details Modal */}
+        <Dialog open={showViewDetails} onOpenChange={setShowViewDetails}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>User Details</DialogTitle>
+              <DialogDescription>Detailed information about the selected user</DialogDescription>
+            </DialogHeader>
+            {selectedUser && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Name</Label>
+                    <p className="text-sm text-gray-600">{selectedUser.firstName} {selectedUser.lastName}</p>
+                  </div>
+                  <div>
+                    <Label>Email</Label>
+                    <p className="text-sm text-gray-600">{selectedUser.email}</p>
+                  </div>
+                  <div>
+                    <Label>Company</Label>
+                    <p className="text-sm text-gray-600">{selectedUser.company || "N/A"}</p>
+                  </div>
+                  <div>
+                    <Label>Plan</Label>
+                    <Badge className={getPlanColor(selectedUser.subscription?.plan || "")}>
+                      {selectedUser.subscription?.plan || "No Plan"}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label>Status</Label>
+                    <Badge variant="secondary" className="bg-green-100 text-green-800">
+                      {selectedUser.subscription?.status || "Unknown"}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label>Total Generations</Label>
+                    <p className="text-sm text-gray-600">{selectedUser.usage?.totalGenerations || 0}</p>
+                  </div>
+                  <div>
+                    <Label>Last Active</Label>
+                    <p className="text-sm text-gray-600">{getLastActive(selectedUser)}</p>
+                  </div>
+                </div>
+                
+                {selectedUser.usage?.toolsUsed && selectedUser.usage.toolsUsed.length > 0 && (
+                  <div>
+                    <Label>Tools Used</Label>
+                    <div className="space-y-2">
+                      {selectedUser.usage.toolsUsed.map((tool, index) => (
+                        <div key={index} className="flex justify-between text-sm">
+                          <span>{tool.toolName}</span>
+                          <span>{tool.usageCount} uses</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <DialogFooter>
+              <Button onClick={() => setShowViewDetails(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit User Modal */}
+        <Dialog open={showEditUser} onOpenChange={(open) => {
+          if (!open) {
+            handleCloseEditModal();
+          }
+        }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit User</DialogTitle>
+              <DialogDescription>Update user information and subscription details</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="firstName">First Name *</Label>
+                  <Input
+                    id="firstName"
+                    value={editUserData.firstName}
+                    onChange={(e) => setEditUserData({...editUserData, firstName: e.target.value})}
+                    placeholder="Enter first name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="lastName">Last Name *</Label>
+                  <Input
+                    id="lastName"
+                    value={editUserData.lastName}
+                    onChange={(e) => setEditUserData({...editUserData, lastName: e.target.value})}
+                    placeholder="Enter last name"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={editUserData.email}
+                  onChange={(e) => setEditUserData({...editUserData, email: e.target.value})}
+                  placeholder="Enter email address"
+                />
+              </div>
+              <div>
+                <Label htmlFor="company">Company</Label>
+                <Input
+                  id="company"
+                  value={editUserData.company}
+                  onChange={(e) => setEditUserData({...editUserData, company: e.target.value})}
+                  placeholder="Enter company name"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="plan">Plan</Label>
+                  <Select value={editUserData.plan} onValueChange={(value) => setEditUserData({...editUserData, plan: value})}>
+                    <option value="">Select Plan</option>
+                    <option value="free_trial">Free Trial</option>
+                    <option value="starter">Starter</option>
+                    <option value="pro">Pro</option>
+                    <option value="agency">Agency</option>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="status">Status</Label>
+                  <Select value={editUserData.status} onValueChange={(value) => setEditUserData({...editUserData, status: value})}>
+                    <option value="">Select Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="trial">Trial</option>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={handleCloseEditModal}>Cancel</Button>
+              <Button onClick={handleSaveEditUser} disabled={loadingAction}>
+                {loadingAction ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Suspend Account Confirmation Modal */}
+        <Dialog open={showSuspendAccount} onOpenChange={setShowSuspendAccount}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Confirm Account Action</DialogTitle>
+              <DialogDescription>
+                {selectedUser?.isSuspended 
+                  ? "Are you sure you want to activate this user account?" 
+                  : "Are you sure you want to suspend this user account? This will prevent them from accessing the platform."
+                }
+              </DialogDescription>
+            </DialogHeader>
+            {selectedUser && (
+              <div className="space-y-4">
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Ban className="w-5 h-5 text-yellow-600" />
+                    <span className="font-medium text-yellow-800">
+                      {selectedUser.firstName} {selectedUser.lastName}
+                    </span>
+                  </div>
+                  <p className="text-sm text-yellow-700 mt-1">{selectedUser.email}</p>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowSuspendAccount(false)}>Cancel</Button>
+              <Button 
+                variant="destructive" 
+                onClick={confirmSuspendAccount}
+                disabled={loadingAction}
+              >
+                {loadingAction ? "Processing..." : (selectedUser?.isSuspended ? "Activate Account" : "Suspend Account")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Account Confirmation Modal */}
+        <Dialog open={showDeleteAccount} onOpenChange={setShowDeleteAccount}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Confirm Account Deletion</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this user account? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedUser && (
+              <div className="space-y-4">
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <X className="w-5 h-5 text-red-600" />
+                    <span className="font-medium text-red-800">
+                      {selectedUser.firstName} {selectedUser.lastName}
+                    </span>
+                  </div>
+                  <p className="text-sm text-red-700 mt-1">{selectedUser.email}</p>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDeleteAccount(false)}>Cancel</Button>
+              <Button 
+                variant="destructive" 
+                onClick={confirmDeleteAccount}
+                disabled={loadingAction}
+              >
+                {loadingAction ? "Processing..." : "Delete Account"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )
