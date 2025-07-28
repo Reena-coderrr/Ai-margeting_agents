@@ -85,6 +85,7 @@ export default function AdCopyPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [result, setResult] = useState<AdCopyResult | null>(null)
   const [copied, setCopied] = useState<{ [key: string]: boolean }>({})
+  const [isExporting, setIsExporting] = useState(false)
 
   const hasAccess = user.plan !== "Free Trial"
 
@@ -122,102 +123,39 @@ export default function AdCopyPage() {
     }
 
     setIsGenerating(true)
+    const token = localStorage.getItem("authToken")
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 4000))
+    try {
+      const res = await fetch("http://localhost:5000/api/ai-tools/ad-copy/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ input: formData }),
+      })
+      const data = await res.json()
 
-    // Mock comprehensive ad copy results
-    const mockResult: AdCopyResult = {
-      variations: formData.platforms.flatMap((platformId) => {
-        const platform = platforms.find((p) => p.id === platformId)
-        if (!platform) return []
+      if (res.ok) {
+        if (data.output && data.output.error) {
+          alert(`Ad copy generation failed: ${data.output.error}`)
+          return
+        }
 
-        return platform.formats.map((format) => ({
-          platform: platform.name,
-          format,
-          headline: generateHeadline(formData.product, formData.usp, format),
-          description: generateDescription(formData.product, formData.audience, formData.usp, format),
-          cta: generateCTA(formData.objective, format),
-          character_count: {
-            headline: generateHeadline(formData.product, formData.usp, format).length,
-            description: generateDescription(formData.product, formData.audience, formData.usp, format).length,
-          },
-          compliance_check: {
-            passed: Math.random() > 0.2,
-            issues: Math.random() > 0.7 ? ["Consider avoiding superlatives", "Add disclaimer for claims"] : [],
-          },
-        }))
-      }),
-      performance_predictions: {
-        expected_ctr: `${(Math.random() * 3 + 2).toFixed(2)}%`,
-        expected_cpc: `$${(Math.random() * 2 + 1).toFixed(2)}`,
-        expected_conversion_rate: `${(Math.random() * 5 + 3).toFixed(1)}%`,
-        quality_score: Math.floor(Math.random() * 3) + 7,
-      },
-      optimization_tips: [
-        {
-          category: "Headlines",
-          tip: "Include numbers and specific benefits to increase click-through rates",
-          impact: "high",
-        },
-        {
-          category: "Call-to-Action",
-          tip: "Use action-oriented verbs that create urgency",
-          impact: "high",
-        },
-        {
-          category: "Keywords",
-          tip: "Integrate primary keywords naturally in headlines for better relevance",
-          impact: "medium",
-        },
-        {
-          category: "Audience Targeting",
-          tip: "Personalize messaging based on audience demographics and interests",
-          impact: "medium",
-        },
-        {
-          category: "Landing Page",
-          tip: "Ensure ad copy matches landing page content for better quality scores",
-          impact: "high",
-        },
-      ],
-      a_b_test_suggestions: [
-        {
-          element: "Headline",
-          variation_a: 'Benefit-focused: "Save 50% on Premium Software"',
-          variation_b: 'Problem-focused: "Stop Wasting Time on Manual Tasks"',
-          test_hypothesis: "Problem-focused headlines may resonate better with pain-aware audiences",
-        },
-        {
-          element: "Call-to-Action",
-          variation_a: 'Generic: "Learn More"',
-          variation_b: 'Specific: "Get Free Demo"',
-          test_hypothesis: "Specific CTAs typically outperform generic ones by 20-30%",
-        },
-        {
-          element: "Description",
-          variation_a: 'Feature-focused: "Advanced analytics dashboard with real-time reporting"',
-          variation_b: 'Benefit-focused: "Make data-driven decisions that boost revenue by 25%"',
-          test_hypothesis: "Benefit-focused copy often converts better than feature lists",
-        },
-      ],
-      keyword_integration: {
-        primary_keywords: formData.keywords
-          .split(",")
-          .slice(0, 3)
-          .map((k) => k.trim())
-          .filter(Boolean),
-        secondary_keywords: formData.keywords
-          .split(",")
-          .slice(3, 8)
-          .map((k) => k.trim())
-          .filter(Boolean),
-        keyword_density: Math.round((Math.random() * 3 + 2) * 10) / 10,
-      },
+        if (data.output && data.output.variations && Array.isArray(data.output.variations)) {
+          setResult(data.output)
+        } else {
+          alert("Invalid ad copy data received. Please try again.")
+        }
+      } else {
+        alert(data.message || "Failed to generate ad copy")
+      }
+    } catch (error) {
+      console.error("Ad copy generation error:", error)
+      alert("Network error. Please check your connection and try again.")
+    } finally {
+      setIsGenerating(false)
     }
-
-    setResult(mockResult)
-    setIsGenerating(false)
   }
 
   const generateHeadline = (product: string, usp: string, format: string) => {
@@ -264,6 +202,88 @@ export default function AdCopyPage() {
     navigator.clipboard.writeText(text)
     setCopied((prev) => ({ ...prev, [id]: true }))
     setTimeout(() => setCopied((prev) => ({ ...prev, [id]: false })), 2000)
+  }
+
+  const handleExportToCSV = () => {
+    if (!result || !result.variations || result.variations.length === 0) {
+      alert("No ad copy to export!");
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      // Create CSV content for ad platform import
+      const headers = [
+        "Platform", "Format", "Headline", "Description", "CTA", "Headline Characters", "Description Characters",
+        "Compliance Passed", "Compliance Issues", "Expected CTR", "Expected CPC", "Expected Conversion Rate",
+        "Quality Score", "Primary Keywords", "Secondary Keywords"
+      ];
+      
+      const rows = result.variations.map((variation) => [
+        variation.platform,
+        variation.format,
+        variation.headline.replace(/\n/g, " ").replace(/\r/g, " "),
+        variation.description.replace(/\n/g, " ").replace(/\r/g, " "),
+        variation.cta,
+        variation.character_count.headline,
+        variation.character_count.description,
+        variation.compliance_check.passed ? "Yes" : "No",
+        variation.compliance_check.issues.join("; "),
+        result.performance_predictions?.expected_ctr || "N/A",
+        result.performance_predictions?.expected_cpc || "N/A",
+        result.performance_predictions?.expected_conversion_rate || "N/A",
+        result.performance_predictions?.quality_score || "N/A",
+        result.keyword_integration?.primary_keywords?.join(", ") || "N/A",
+        result.keyword_integration?.secondary_keywords?.join(", ") || "N/A"
+      ]);
+
+      const csvContent = [
+        headers.join(","),
+        ...rows.map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","))
+      ].join("\r\n");
+
+      // Create a Blob and trigger download
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "ad-copy-variations.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      // Also create a JSON export for advanced ad platforms
+      const jsonExport = {
+        variations: result.variations,
+        performance_predictions: result.performance_predictions,
+        optimization_tips: result.optimization_tips,
+        a_b_test_suggestions: result.a_b_test_suggestions,
+        keyword_integration: result.keyword_integration,
+        exportDate: new Date().toISOString(),
+        platform: "AI Marketing Agents"
+      };
+      
+      const jsonBlob = new Blob([JSON.stringify(jsonExport, null, 2)], { type: "application/json" });
+      const jsonUrl = URL.createObjectURL(jsonBlob);
+      const jsonLink = document.createElement("a");
+      jsonLink.href = jsonUrl;
+      jsonLink.setAttribute("download", "ad-copy-data.json");
+      document.body.appendChild(jsonLink);
+      jsonLink.click();
+      document.body.removeChild(jsonLink);
+      URL.revokeObjectURL(jsonUrl);
+
+      setTimeout(() => {
+        setIsExporting(false);
+        alert("Ad copy exported successfully! You can now import the CSV file into your ad platform.");
+      }, 1000);
+    } catch (error) {
+      console.error("Export error:", error);
+      setIsExporting(false);
+      alert("Export failed. Please try again.");
+    }
   }
 
   const getImpactColor = (impact: string) => {
@@ -519,27 +539,39 @@ export default function AdCopyPage() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="text-center p-3 bg-blue-50 rounded-lg">
                         <div className="text-2xl font-bold text-blue-600">
-                          {result.performance_predictions.expected_ctr}
+                          {result.performance_predictions && result.performance_predictions.expected_ctr !== undefined
+                            ? result.performance_predictions.expected_ctr
+                            : "N/A"}
                         </div>
                         <div className="text-sm text-gray-600">Expected CTR</div>
                       </div>
                       <div className="text-center p-3 bg-green-50 rounded-lg">
                         <div className="text-2xl font-bold text-green-600">
-                          {result.performance_predictions.expected_cpc}
+                          {result.performance_predictions && result.performance_predictions.expected_cpc !== undefined
+                            ? result.performance_predictions.expected_cpc
+                            : "N/A"}
                         </div>
                         <div className="text-sm text-gray-600">Expected CPC</div>
                       </div>
                       <div className="text-center p-3 bg-purple-50 rounded-lg">
                         <div className="text-2xl font-bold text-purple-600">
-                          {result.performance_predictions.expected_conversion_rate}
+                          {result.performance_predictions && result.performance_predictions.expected_conversion_rate !== undefined
+                            ? result.performance_predictions.expected_conversion_rate
+                            : "N/A"}
                         </div>
                         <div className="text-sm text-gray-600">Conversion Rate</div>
                       </div>
                       <div className="text-center p-3 bg-orange-50 rounded-lg">
                         <div
-                          className={`text-2xl font-bold ${getQualityScoreColor(result.performance_predictions.quality_score)}`}
+                          className={`text-2xl font-bold ${
+                            result.performance_predictions && result.performance_predictions.quality_score !== undefined
+                              ? getQualityScoreColor(result.performance_predictions.quality_score)
+                              : ""
+                          }`}
                         >
-                          {result.performance_predictions.quality_score}/10
+                          {result.performance_predictions && result.performance_predictions.quality_score !== undefined
+                            ? result.performance_predictions.quality_score
+                            : "N/A"}/10
                         </div>
                         <div className="text-sm text-gray-600">Quality Score</div>
                       </div>
@@ -552,86 +584,90 @@ export default function AdCopyPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Eye className="w-5 h-5 text-red-500" />
-                      Generated Ad Variations ({result.variations.length})
+                      Generated Ad Variations ({result.variations ? result.variations.length : 0})
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {result.variations.map((variation, index) => (
-                      <div key={index} className="border rounded-lg p-6 bg-white">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary">{variation.platform}</Badge>
-                            <Badge variant="outline">{variation.format}</Badge>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                copyToClipboard(
-                                  `${variation.headline}\n\n${variation.description}\n\n${variation.cta}`,
-                                  `ad-${index}`,
-                                )
-                              }
-                            >
-                              {copied[`ad-${index}`] ? (
-                                <CheckCircle className="w-4 h-4" />
+                    {result.variations && Array.isArray(result.variations) && result.variations.length > 0 ? (
+                      result.variations.map((variation, index) => (
+                        <div key={index} className="border rounded-lg p-6 bg-white">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary">{variation.platform}</Badge>
+                              <Badge variant="outline">{variation.format}</Badge>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  copyToClipboard(
+                                    `${variation.headline}\n\n${variation.description}\n\n${variation.cta}`,
+                                    `ad-${index}`,
+                                  )
+                                }
+                              >
+                                {copied[`ad-${index}`] ? (
+                                  <CheckCircle className="w-4 h-4" />
+                                ) : (
+                                  <Copy className="w-4 h-4" />
+                                )}
+                              </Button>
+                              {variation.compliance_check.passed ? (
+                                <Badge className="bg-green-100 text-green-800">✓ Compliant</Badge>
                               ) : (
-                                <Copy className="w-4 h-4" />
+                                <Badge className="bg-yellow-100 text-yellow-800">⚠ Review</Badge>
                               )}
-                            </Button>
-                            {variation.compliance_check.passed ? (
-                              <Badge className="bg-green-100 text-green-800">✓ Compliant</Badge>
-                            ) : (
-                              <Badge className="bg-yellow-100 text-yellow-800">⚠ Review</Badge>
+                            </div>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div>
+                              <h4 className="font-medium text-gray-900 mb-2">Headline:</h4>
+                              <div className="bg-blue-50 p-3 rounded-lg">
+                                <p className="font-medium text-blue-900">{variation.headline}</p>
+                                <p className="text-xs text-blue-600 mt-1">
+                                  {variation.character_count.headline} characters
+                                </p>
+                              </div>
+                            </div>
+
+                            <div>
+                              <h4 className="font-medium text-gray-900 mb-2">Description:</h4>
+                              <div className="bg-gray-50 p-3 rounded-lg">
+                                <p className="text-gray-700">{variation.description}</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {variation.character_count.description} characters
+                                </p>
+                              </div>
+                            </div>
+
+                            <div>
+                              <h4 className="font-medium text-gray-900 mb-2">Call-to-Action:</h4>
+                              <div className="bg-green-50 p-3 rounded-lg">
+                                <p className="font-medium text-green-800">{variation.cta}</p>
+                              </div>
+                            </div>
+
+                            {!variation.compliance_check.passed && variation.compliance_check.issues.length > 0 && (
+                              <div>
+                                <h4 className="font-medium text-gray-900 mb-2">Compliance Issues:</h4>
+                                <ul className="space-y-1">
+                                  {variation.compliance_check.issues.map((issue, idx) => (
+                                    <li key={idx} className="text-sm text-yellow-700 flex items-center gap-2">
+                                      <span className="w-1 h-1 bg-yellow-500 rounded-full"></span>
+                                      {issue}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
                             )}
                           </div>
                         </div>
-
-                        <div className="space-y-4">
-                          <div>
-                            <h4 className="font-medium text-gray-900 mb-2">Headline:</h4>
-                            <div className="bg-blue-50 p-3 rounded-lg">
-                              <p className="font-medium text-blue-900">{variation.headline}</p>
-                              <p className="text-xs text-blue-600 mt-1">
-                                {variation.character_count.headline} characters
-                              </p>
-                            </div>
-                          </div>
-
-                          <div>
-                            <h4 className="font-medium text-gray-900 mb-2">Description:</h4>
-                            <div className="bg-gray-50 p-3 rounded-lg">
-                              <p className="text-gray-700">{variation.description}</p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                {variation.character_count.description} characters
-                              </p>
-                            </div>
-                          </div>
-
-                          <div>
-                            <h4 className="font-medium text-gray-900 mb-2">Call-to-Action:</h4>
-                            <div className="bg-green-50 p-3 rounded-lg">
-                              <p className="font-medium text-green-800">{variation.cta}</p>
-                            </div>
-                          </div>
-
-                          {!variation.compliance_check.passed && variation.compliance_check.issues.length > 0 && (
-                            <div>
-                              <h4 className="font-medium text-gray-900 mb-2">Compliance Issues:</h4>
-                              <ul className="space-y-1">
-                                {variation.compliance_check.issues.map((issue, idx) => (
-                                  <li key={idx} className="text-sm text-yellow-700 flex items-center gap-2">
-                                    <span className="w-1 h-1 bg-yellow-500 rounded-full"></span>
-                                    {issue}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <div className="text-gray-400">No ad variations found.</div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -647,19 +683,25 @@ export default function AdCopyPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                       <div className="text-center p-3 bg-blue-50 rounded-lg">
                         <div className="text-2xl font-bold text-blue-600">
-                          {result.keyword_integration.primary_keywords.length}
+                          {result.keyword_integration && result.keyword_integration.primary_keywords !== undefined
+                            ? result.keyword_integration.primary_keywords.length
+                            : "N/A"}
                         </div>
                         <div className="text-sm text-gray-600">Primary Keywords</div>
                       </div>
                       <div className="text-center p-3 bg-green-50 rounded-lg">
                         <div className="text-2xl font-bold text-green-600">
-                          {result.keyword_integration.secondary_keywords.length}
+                          {result.keyword_integration && result.keyword_integration.secondary_keywords !== undefined
+                            ? result.keyword_integration.secondary_keywords.length
+                            : "N/A"}
                         </div>
                         <div className="text-sm text-gray-600">Secondary Keywords</div>
                       </div>
                       <div className="text-center p-3 bg-purple-50 rounded-lg">
                         <div className="text-2xl font-bold text-purple-600">
-                          {result.keyword_integration.keyword_density}%
+                          {result.keyword_integration && result.keyword_integration.keyword_density !== undefined
+                            ? result.keyword_integration.keyword_density
+                            : "N/A"}%
                         </div>
                         <div className="text-sm text-gray-600">Keyword Density</div>
                       </div>
@@ -669,22 +711,26 @@ export default function AdCopyPage() {
                       <div>
                         <h4 className="font-medium text-gray-900 mb-2">Primary Keywords:</h4>
                         <div className="flex flex-wrap gap-2">
-                          {result.keyword_integration.primary_keywords.map((keyword, index) => (
-                            <Badge key={index} className="bg-blue-100 text-blue-800">
-                              {keyword}
-                            </Badge>
-                          ))}
+                          {result.keyword_integration && result.keyword_integration.primary_keywords !== undefined
+                            ? result.keyword_integration.primary_keywords.map((keyword, index) => (
+                                <Badge key={index} className="bg-blue-100 text-blue-800">
+                                  {keyword}
+                                </Badge>
+                              ))
+                            : "N/A"}
                         </div>
                       </div>
 
                       <div>
                         <h4 className="font-medium text-gray-900 mb-2">Secondary Keywords:</h4>
                         <div className="flex flex-wrap gap-2">
-                          {result.keyword_integration.secondary_keywords.map((keyword, index) => (
-                            <Badge key={index} variant="secondary">
-                              {keyword}
-                            </Badge>
-                          ))}
+                          {result.keyword_integration && result.keyword_integration.secondary_keywords !== undefined
+                            ? result.keyword_integration.secondary_keywords.map((keyword, index) => (
+                                <Badge key={index} variant="secondary">
+                                  {keyword}
+                                </Badge>
+                              ))
+                            : "N/A"}
                         </div>
                       </div>
                     </div>
@@ -696,29 +742,33 @@ export default function AdCopyPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <MousePointer className="w-5 h-5 text-purple-500" />
-                      A/B Test Suggestions ({result.a_b_test_suggestions.length})
+                      A/B Test Suggestions ({result.a_b_test_suggestions ? result.a_b_test_suggestions.length : 0})
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {result.a_b_test_suggestions.map((test, index) => (
-                      <div key={index} className="border rounded-lg p-4">
-                        <h4 className="font-medium text-gray-900 mb-2">{test.element} Test</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                          <div>
-                            <h5 className="text-sm font-medium text-blue-700 mb-1">Variation A:</h5>
-                            <p className="text-sm text-gray-600 bg-blue-50 p-2 rounded">{test.variation_a}</p>
+                    {result.a_b_test_suggestions && Array.isArray(result.a_b_test_suggestions) && result.a_b_test_suggestions.length > 0 ? (
+                      result.a_b_test_suggestions.map((test, index) => (
+                        <div key={index} className="border rounded-lg p-4">
+                          <h4 className="font-medium text-gray-900 mb-2">{test.element} Test</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                            <div>
+                              <h5 className="text-sm font-medium text-blue-700 mb-1">Variation A:</h5>
+                              <p className="text-sm text-gray-600 bg-blue-50 p-2 rounded">{test.variation_a}</p>
+                            </div>
+                            <div>
+                              <h5 className="text-sm font-medium text-green-700 mb-1">Variation B:</h5>
+                              <p className="text-sm text-gray-600 bg-green-50 p-2 rounded">{test.variation_b}</p>
+                            </div>
                           </div>
-                          <div>
-                            <h5 className="text-sm font-medium text-green-700 mb-1">Variation B:</h5>
-                            <p className="text-sm text-gray-600 bg-green-50 p-2 rounded">{test.variation_b}</p>
+                          <div className="bg-purple-50 p-3 rounded">
+                            <h5 className="text-sm font-medium text-purple-700 mb-1">Test Hypothesis:</h5>
+                            <p className="text-sm text-purple-600">{test.test_hypothesis}</p>
                           </div>
                         </div>
-                        <div className="bg-purple-50 p-3 rounded">
-                          <h5 className="text-sm font-medium text-purple-700 mb-1">Test Hypothesis:</h5>
-                          <p className="text-sm text-purple-600">{test.test_hypothesis}</p>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <div className="text-gray-400">No A/B test suggestions found.</div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -727,19 +777,23 @@ export default function AdCopyPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <TrendingUp className="w-5 h-5 text-orange-500" />
-                      Optimization Tips ({result.optimization_tips.length})
+                      Optimization Tips ({result.optimization_tips ? result.optimization_tips.length : 0})
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {result.optimization_tips.map((tip, index) => (
-                      <div key={index} className="border rounded-lg p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <h4 className="font-medium text-gray-900">{tip.category}</h4>
-                          <Badge className={getImpactColor(tip.impact)}>{tip.impact} impact</Badge>
+                    {result.optimization_tips && Array.isArray(result.optimization_tips) && result.optimization_tips.length > 0 ? (
+                      result.optimization_tips.map((tip, index) => (
+                        <div key={index} className="border rounded-lg p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <h4 className="font-medium text-gray-900">{tip.category}</h4>
+                            <Badge className={getImpactColor(tip.impact)}>{tip.impact} impact</Badge>
+                          </div>
+                          <p className="text-sm text-gray-600">{tip.tip}</p>
                         </div>
-                        <p className="text-sm text-gray-600">{tip.tip}</p>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <div className="text-gray-400">No optimization tips found.</div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -753,9 +807,18 @@ export default function AdCopyPage() {
                     {copied["all-ads"] ? <CheckCircle className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
                     {copied["all-ads"] ? "Copied!" : "Copy All Ad Copy"}
                   </Button>
-                  <Button variant="outline" className="flex-1 bg-transparent">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export to CSV
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 bg-transparent" 
+                    onClick={handleExportToCSV}
+                    disabled={isExporting}
+                  >
+                    {isExporting ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4 mr-2" />
+                    )}
+                    {isExporting ? "Exporting..." : "Export to CSV"}
                   </Button>
                 </div>
               </div>

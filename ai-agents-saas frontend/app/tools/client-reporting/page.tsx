@@ -26,6 +26,7 @@ import {
   DollarSign,
 } from "lucide-react"
 import { useUserStore } from "@/lib/user-store"
+import jsPDF from "jspdf";
 
 interface ReportMetric {
   name: string
@@ -82,6 +83,7 @@ export default function ClientReportingPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [result, setResult] = useState<ReportResult | null>(null)
   const [copied, setCopied] = useState(false)
+  const [isExportingPDF, setIsExportingPDF] = useState(false)
 
   const hasAccess = user.plan !== "Free Trial"
 
@@ -331,6 +333,180 @@ The data clearly shows that our strategic approach is working. We recommend main
         return "bg-gray-100 text-gray-800"
     }
   }
+
+  const handleDownloadPDF = () => {
+    if (!result) {
+      alert("No report data available to export!");
+      return;
+    }
+    
+    setIsExportingPDF(true);
+    
+    try {
+      const doc = new jsPDF();
+      let yPosition = 20;
+      
+      // Title
+      doc.setFontSize(20);
+      doc.text("Client Report", 20, yPosition);
+      yPosition += 15;
+      
+      // Client and Date
+      doc.setFontSize(12);
+      doc.text(`Client: ${formData.clientName || "N/A"}`, 20, yPosition);
+      yPosition += 8;
+      doc.text(`Report Period: ${formData.reportPeriod || "N/A"}`, 20, yPosition);
+      yPosition += 8;
+      doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, yPosition);
+      yPosition += 15;
+      
+      // Executive Summary
+      doc.setFontSize(16);
+      doc.text("Executive Summary", 20, yPosition);
+      yPosition += 10;
+      
+      doc.setFontSize(10);
+      const summaryLines = doc.splitTextToSize(result.executive_summary, 170);
+      summaryLines.forEach((line: string) => {
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        doc.text(line, 20, yPosition);
+        yPosition += 5;
+      });
+      yPosition += 10;
+      
+      // Key Metrics
+      if (yPosition > 200) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      doc.setFontSize(16);
+      doc.text("Key Performance Metrics", 20, yPosition);
+      yPosition += 10;
+      
+      doc.setFontSize(10);
+      result.key_metrics.forEach((metric, index) => {
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        const metricText = `${metric.name}: ${formatNumber(metric.current)}${metric.unit} (${metric.change > 0 ? '+' : ''}${metric.change.toFixed(1)}%)`;
+        doc.text(metricText, 20, yPosition);
+        yPosition += 6;
+      });
+      yPosition += 10;
+      
+      // Campaign Performance
+      if (yPosition > 200) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      doc.setFontSize(16);
+      doc.text("Campaign Performance", 20, yPosition);
+      yPosition += 10;
+      
+      doc.setFontSize(10);
+      result.campaign_performance.forEach((campaign, index) => {
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        doc.text(`${campaign.name}:`, 20, yPosition);
+        yPosition += 5;
+        doc.text(`  ROI: ${campaign.roi.toFixed(1)}x | Cost: ${formatCurrency(campaign.cost)} | Conversions: ${campaign.conversions}`, 25, yPosition);
+        yPosition += 8;
+      });
+      yPosition += 10;
+      
+      // Recommendations
+      if (yPosition > 200) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      doc.setFontSize(16);
+      doc.text("Strategic Recommendations", 20, yPosition);
+      yPosition += 10;
+      
+      doc.setFontSize(10);
+      result.recommendations.forEach((rec, index) => {
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        doc.text(`${rec.title} (${rec.priority} priority)`, 20, yPosition);
+        yPosition += 5;
+        const descLines = doc.splitTextToSize(rec.description, 160);
+        descLines.forEach((line: string) => {
+          doc.text(line, 25, yPosition);
+          yPosition += 5;
+        });
+        yPosition += 5;
+      });
+      yPosition += 10;
+      
+      // Next Month Goals
+      if (yPosition > 200) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      doc.setFontSize(16);
+      doc.text("Next Month Goals", 20, yPosition);
+      yPosition += 10;
+      
+      doc.setFontSize(10);
+      result.next_month_goals.forEach((goal, index) => {
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        doc.text(`${goal.metric}: ${goal.target}`, 20, yPosition);
+        yPosition += 5;
+        const strategyLines = doc.splitTextToSize(goal.strategy, 160);
+        strategyLines.forEach((line: string) => {
+          doc.text(line, 25, yPosition);
+          yPosition += 5;
+        });
+        yPosition += 5;
+      });
+      
+      // Visual Insights
+      if (yPosition > 200) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      doc.setFontSize(16);
+      doc.text("Visual Insights", 20, yPosition);
+      yPosition += 10;
+      
+      doc.setFontSize(10);
+      result.visual_insights.forEach((insight, index) => {
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        doc.text(`${insight.title}`, 20, yPosition);
+        yPosition += 5;
+        doc.text(`  ${insight.description}`, 25, yPosition);
+        yPosition += 5;
+        doc.text(`  Data: ${insight.data_points.join(', ')}`, 25, yPosition);
+        yPosition += 8;
+      });
+      
+      const fileName = `client-report-${formData.clientName?.replace(/[^a-zA-Z0-9]/g, '-') || 'client'}-${formData.reportPeriod?.replace(/[^a-zA-Z0-9]/g, '-') || 'report'}.pdf`;
+      doc.save(fileName);
+      
+      setTimeout(() => {
+        setIsExportingPDF(false);
+        alert("PDF report generated successfully!");
+      }, 500);
+    } catch (error) {
+      console.error("PDF generation error:", error);
+      setIsExportingPDF(false);
+      alert("Failed to generate PDF. Please try again.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -725,9 +901,9 @@ The data clearly shows that our strategic approach is working. We recommend main
                     {copied ? <CheckCircle className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
                     {copied ? "Copied!" : "Copy Full Report"}
                   </Button>
-                  <Button variant="outline" className="flex-1 bg-transparent">
-                    <Download className="w-4 h-4 mr-2" />
-                    Download PDF Report
+                  <Button variant="outline" className="flex-1 bg-transparent" onClick={handleDownloadPDF}>
+                    {isExportingPDF ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                    {isExportingPDF ? "Generating..." : "Download PDF Report"}
                   </Button>
                 </div>
               </div>

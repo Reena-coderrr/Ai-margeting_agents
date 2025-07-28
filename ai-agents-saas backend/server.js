@@ -47,6 +47,7 @@ const adminRoutes = require("./routes/admin")
 const subscriptionRoutes = require("./routes/subscriptions")
 const aiToolRoutes = require("./routes/aiTools")
 const analyticsRoutes = require("./routes/analytics")
+const dashboardRoutes = require("./routes/dashboard")
 
 // Routes
 app.use("/api/auth", authRoutes)
@@ -55,6 +56,7 @@ app.use("/api/admin", require("./routes/admin"));
 app.use("/api/subscriptions", subscriptionRoutes)
 app.use("/api/ai-tools", aiToolRoutes)
 app.use("/api/analytics", analyticsRoutes)
+app.use("/api/dashboard", dashboardRoutes)
 
 // Health Check
 app.get("/api/health", (req, res) => {

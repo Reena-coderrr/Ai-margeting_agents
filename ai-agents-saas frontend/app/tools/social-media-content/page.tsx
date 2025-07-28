@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -12,6 +12,7 @@ import { Header } from "@/components/header"
 import Link from "next/link"
 import { ArrowLeft, Play, Download, Copy, CheckCircle, Loader2, Share2, TrendingUp, Hash } from "lucide-react"
 import { useUserStore } from "@/lib/user-store"
+import { useRouter } from "next/navigation";
 
 interface SocialMediaResult {
   posts: {
@@ -48,6 +49,7 @@ interface SocialMediaResult {
 
 export default function SocialMediaContentPage() {
   const { user } = useUserStore()
+  const router = useRouter();
   const [formData, setFormData] = useState({
     business: "",
     industry: "",
@@ -60,6 +62,17 @@ export default function SocialMediaContentPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [result, setResult] = useState<SocialMediaResult | null>(null)
   const [copied, setCopied] = useState<{ [key: string]: boolean }>({})
+  const [userPlan, setUserPlan] = useState<string | null>(null);
+
+  useEffect(() => {
+    const user = localStorage.getItem("user");
+    if (user) {
+      try {
+        const parsed = JSON.parse(user);
+        setUserPlan(parsed.subscription?.plan || parsed.plan || null);
+      } catch {}
+    }
+  }, []);
 
   const handleInputChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }))
@@ -79,157 +92,21 @@ export default function SocialMediaContentPage() {
     }
 
     setIsGenerating(true)
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 3000))
-
-    // Mock social media content results
-    const mockResult: SocialMediaResult = {
-      posts: [
-        {
-          platform: "Instagram",
-          content: `🚀 Transform your ${formData.industry} game with these insider tips!
-
-Swipe to see the 5 strategies that helped our clients achieve incredible results 👆
-
-Which one resonates most with you? Drop a comment below! 👇
-
-#${formData.industry.replace(/\s+/g, "")} #BusinessTips #Success`,
-          hashtags: ["#businesstips", "#success", "#motivation", "#entrepreneur", "#growth"],
-          bestTime: "Tuesday 11:00 AM",
-          engagement: "High (8-12%)",
-        },
-        {
-          platform: "LinkedIn",
-          content: `The biggest mistake I see ${formData.targetAudience} make:
-
-They focus on perfection instead of progress.
-
-Here's what I learned after working with 100+ clients in ${formData.industry}:
-
-→ Start before you're ready
-→ Iterate based on feedback  
-→ Consistency beats perfection
-→ Small wins compound over time
-
-What's holding you back from taking that first step?
-
-#${formData.industry.replace(/\s+/g, "")} #Leadership #BusinessStrategy`,
-          hashtags: ["#leadership", "#businessstrategy", "#growth", "#success"],
-          bestTime: "Wednesday 9:00 AM",
-          engagement: "Medium-High (6-10%)",
-        },
-        {
-          platform: "Twitter",
-          content: `Quick thread on ${formData.industry} trends for 2024 🧵
-
-1/ The landscape is changing faster than ever
-2/ ${formData.targetAudience} need to adapt or get left behind
-3/ Here are the 3 key shifts I'm seeing...
-
-(Thread continues with actionable insights)
-
-#${formData.industry.replace(/\s+/g, "")} #Trends2024`,
-          hashtags: ["#trends2024", "#business", "#innovation"],
-          bestTime: "Thursday 2:00 PM",
-          engagement: "Medium (4-8%)",
-        },
-        {
-          platform: "Facebook",
-          content: `🎯 CASE STUDY: How we helped [Client Name] achieve [specific result] in just 90 days
-
-The Challenge:
-Like many ${formData.targetAudience}, they were struggling with [common problem]
-
-The Solution:
-We implemented our proven 3-step framework:
-✅ Step 1: [Brief description]
-✅ Step 2: [Brief description]  
-✅ Step 3: [Brief description]
-
-The Results:
-📈 [Specific metric] increased by X%
-💰 [Revenue/savings] of $X
-⏰ Saved X hours per week
-
-Want similar results? Comment "INTERESTED" below and I'll send you our free guide!
-
-#${formData.industry.replace(/\s+/g, "")} #CaseStudy #Results`,
-          hashtags: ["#casestudy", "#results", "#success", "#business"],
-          bestTime: "Friday 1:00 PM",
-          engagement: "High (10-15%)",
-        },
-      ],
-      strategy: {
-        contentMix: [
-          {
-            type: "Educational",
-            percentage: 40,
-            description: "Tips, tutorials, and how-to content that provides value",
-          },
-          {
-            type: "Behind-the-Scenes",
-            percentage: 20,
-            description: "Company culture, team highlights, and process insights",
-          },
-          {
-            type: "User-Generated Content",
-            percentage: 15,
-            description: "Customer testimonials, reviews, and success stories",
-          },
-          {
-            type: "Promotional",
-            percentage: 15,
-            description: "Product/service announcements and special offers",
-          },
-          {
-            type: "Industry News",
-            percentage: 10,
-            description: "Relevant news, trends, and thought leadership",
-          },
-        ],
-        postingSchedule: [
-          {
-            day: "Monday",
-            times: ["9:00 AM", "3:00 PM"],
-            contentType: "Motivational/Week Kickoff",
-          },
-          {
-            day: "Tuesday",
-            times: ["11:00 AM", "5:00 PM"],
-            contentType: "Educational/Tips",
-          },
-          {
-            day: "Wednesday",
-            times: ["9:00 AM", "2:00 PM"],
-            contentType: "Behind-the-Scenes",
-          },
-          {
-            day: "Thursday",
-            times: ["10:00 AM", "4:00 PM"],
-            contentType: "Industry Insights",
-          },
-          {
-            day: "Friday",
-            times: ["1:00 PM", "6:00 PM"],
-            contentType: "Case Studies/Success Stories",
-          },
-        ],
-        hashtagStrategy: {
-          trending: ["#BusinessGrowth", "#Success", "#Motivation", "#Entrepreneur"],
-          niche: [`#${formData.industry.replace(/\s+/g, "")}`, "#Innovation", "#Strategy"],
-          branded: [`#${formData.business.replace(/\s+/g, "")}`, "#TeamWork", "#Excellence"],
-        },
+    const token = localStorage.getItem("authToken")
+    const res = await fetch("http://localhost:5000/api/ai-tools/social-media/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
-      analytics: {
-        expectedReach: "15,000-25,000",
-        engagementRate: "6-12%",
-        bestPerformingContent: "Educational posts and case studies",
-        growthProjection: "20-30% follower growth in 90 days",
-      },
+      body: JSON.stringify({ input: formData }),
+    })
+    const data = await res.json()
+    if (res.ok) {
+      setResult(data.output)
+    } else {
+      alert(data.message || "Failed to generate content")
     }
-
-    setResult(mockResult)
     setIsGenerating(false)
   }
 
@@ -239,6 +116,44 @@ Want similar results? Comment "INTERESTED" below and I'll send you our free guid
     setTimeout(() => setCopied((prev) => ({ ...prev, [id]: false })), 2000)
   }
 
+  const handleExportCalendar = () => {
+    if (!result || !result.posts || result.posts.length === 0) {
+      alert("No content to export!");
+      return;
+    }
+    // Prepare CSV header
+    const headers = [
+      "Platform",
+      "Content",
+      "Hashtags",
+      "Best Time",
+      "Engagement"
+    ];
+    // Prepare CSV rows
+    const rows = result.posts.map(post => [
+      post.platform,
+      post.content.replace(/\n/g, " ").replace(/\r/g, " "),
+      post.hashtags.join(" "),
+      post.bestTime,
+      post.engagement
+    ]);
+    // Combine header and rows
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","))
+    ].join("\r\n");
+    // Create a Blob and trigger download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "content-calendar.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -246,9 +161,12 @@ Want similar results? Comment "INTERESTED" below and I'll send you our free guid
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <Link href="/tools" className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors">
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg px-4 py-2 font-medium transition-colors"
+          >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Tools
+            Back to Dashboard
           </Link>
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
@@ -410,15 +328,15 @@ Want similar results? Comment "INTERESTED" below and I'll send you our free guid
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="text-center p-3 bg-blue-50 rounded-lg">
-                        <div className="text-2xl font-bold text-blue-600">{result.analytics.expectedReach}</div>
+                        <div className="text-2xl font-bold text-blue-600">{result.analytics?.expectedReach || "N/A"}</div>
                         <div className="text-sm text-gray-600">Expected Reach</div>
                       </div>
                       <div className="text-center p-3 bg-green-50 rounded-lg">
-                        <div className="text-2xl font-bold text-green-600">{result.analytics.engagementRate}</div>
+                        <div className="text-2xl font-bold text-green-600">{result.analytics?.engagementRate || "N/A"}</div>
                         <div className="text-sm text-gray-600">Engagement Rate</div>
                       </div>
                       <div className="text-center p-3 bg-purple-50 rounded-lg">
-                        <div className="text-lg font-bold text-purple-600">{result.analytics.growthProjection}</div>
+                        <div className="text-lg font-bold text-purple-600">{result.analytics?.growthProjection || "N/A"}</div>
                         <div className="text-sm text-gray-600">Growth Projection</div>
                       </div>
                       <div className="text-center p-3 bg-yellow-50 rounded-lg">
@@ -437,7 +355,7 @@ Want similar results? Comment "INTERESTED" below and I'll send you our free guid
                   </TabsList>
 
                   <TabsContent value="posts" className="space-y-4">
-                    {result.posts.map((post, index) => (
+                    {(result.posts ?? []).map((post, index) => (
                       <Card key={index}>
                         <CardHeader>
                           <div className="flex items-center justify-between">
@@ -467,7 +385,7 @@ Want similar results? Comment "INTERESTED" below and I'll send you our free guid
                             <div>
                               <p className="text-sm text-gray-600 mb-2">Recommended Hashtags:</p>
                               <div className="flex flex-wrap gap-1">
-                                {post.hashtags.map((hashtag, hIndex) => (
+                                {(post.hashtags ?? []).map((hashtag, hIndex) => (
                                   <Badge key={hIndex} variant="secondary" className="text-xs">
                                     {hashtag}
                                   </Badge>
@@ -487,7 +405,7 @@ Want similar results? Comment "INTERESTED" below and I'll send you our free guid
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
-                          {result.strategy.contentMix.map((mix, index) => (
+                          {result.strategy?.contentMix?.map((mix, index) => (
                             <div key={index} className="flex items-center gap-4">
                               <div className="w-16 text-center">
                                 <div className="text-2xl font-bold text-pink-600">{mix.percentage}%</div>
@@ -516,7 +434,7 @@ Want similar results? Comment "INTERESTED" below and I'll send you our free guid
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-3">
-                          {result.strategy.postingSchedule.map((schedule, index) => (
+                          {result.strategy?.postingSchedule?.map((schedule, index) => (
                             <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                               <div className="font-medium">{schedule.day}</div>
                               <div className="flex gap-2">
@@ -545,7 +463,7 @@ Want similar results? Comment "INTERESTED" below and I'll send you our free guid
                         </CardHeader>
                         <CardContent>
                           <div className="space-y-2">
-                            {result.strategy.hashtagStrategy.trending.map((hashtag, index) => (
+                            {result.strategy?.hashtagStrategy?.trending?.map((hashtag, index) => (
                               <div key={index} className="flex items-center justify-between">
                                 <Badge className="bg-blue-100 text-blue-800">{hashtag}</Badge>
                                 <Button
@@ -574,7 +492,7 @@ Want similar results? Comment "INTERESTED" below and I'll send you our free guid
                         </CardHeader>
                         <CardContent>
                           <div className="space-y-2">
-                            {result.strategy.hashtagStrategy.niche.map((hashtag, index) => (
+                            {result.strategy?.hashtagStrategy?.niche?.map((hashtag, index) => (
                               <div key={index} className="flex items-center justify-between">
                                 <Badge className="bg-green-100 text-green-800">{hashtag}</Badge>
                                 <Button
@@ -603,7 +521,7 @@ Want similar results? Comment "INTERESTED" below and I'll send you our free guid
                         </CardHeader>
                         <CardContent>
                           <div className="space-y-2">
-                            {result.strategy.hashtagStrategy.branded.map((hashtag, index) => (
+                            {result.strategy?.hashtagStrategy?.branded?.map((hashtag, index) => (
                               <div key={index} className="flex items-center justify-between">
                                 <Badge className="bg-purple-100 text-purple-800">{hashtag}</Badge>
                                 <Button
@@ -640,7 +558,7 @@ Want similar results? Comment "INTERESTED" below and I'll send you our free guid
                     )}
                     {copied["all-content"] ? "Copied!" : "Copy All Content"}
                   </Button>
-                  <Button variant="outline" className="flex-1 bg-transparent">
+                  <Button variant="outline" className="flex-1 bg-transparent" onClick={handleExportCalendar}>
                     <Download className="w-4 h-4 mr-2" />
                     Export Content Calendar
                   </Button>

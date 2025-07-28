@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 import { useUserStore } from "@/lib/user-store"
 import { Target, BarChart3 } from "lucide-react" // Import missing variables
+import jsPDF from "jspdf";
 
 interface CompetitorData {
   name: string
@@ -375,6 +376,210 @@ export default function CompetitorAnalysisPage() {
     if (yourScore < avgScore) return "text-red-600"
     return "text-gray-600"
   }
+
+  const handleDownloadPDF = () => {
+    if (!result) return;
+    
+    const doc = new jsPDF();
+    let yPosition = 20;
+    
+    // Title
+    doc.setFontSize(20);
+    doc.setFont(undefined, 'bold');
+    doc.text("Competitor Analysis Report", 20, yPosition);
+    yPosition += 15;
+    
+    // Company Information
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text("Analysis Overview", 20, yPosition);
+    yPosition += 10;
+    
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Your Company: ${formData.yourCompany || "N/A"}`, 20, yPosition);
+    yPosition += 8;
+    doc.text(`Industry: ${formData.industry || "N/A"}`, 20, yPosition);
+    yPosition += 8;
+    doc.text(`Target Market: ${formData.location || "N/A"}`, 20, yPosition);
+    yPosition += 15;
+    
+    // Market Analysis
+    if (result.market_analysis) {
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text("Market Analysis", 20, yPosition);
+      yPosition += 10;
+      
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Market Size: ${result.market_analysis.market_size || "N/A"}`, 20, yPosition);
+      yPosition += 8;
+      doc.text(`Growth Rate: ${result.market_analysis.growth_rate || "N/A"}`, 20, yPosition);
+      yPosition += 8;
+      
+      if (result.market_analysis.key_trends && result.market_analysis.key_trends.length > 0) {
+        doc.text("Key Market Trends:", 20, yPosition);
+        yPosition += 8;
+        result.market_analysis.key_trends.forEach((trend: string) => {
+          doc.text(`• ${trend}`, 25, yPosition);
+          yPosition += 6;
+        });
+      }
+      yPosition += 10;
+    }
+    
+    // Competitors
+    if (result.competitors && result.competitors.length > 0) {
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text("Competitor Analysis", 20, yPosition);
+      yPosition += 10;
+      
+      result.competitors.forEach((competitor: any, index: number) => {
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text(`${index + 1}. ${competitor.name || "Unknown"}`, 20, yPosition);
+        yPosition += 8;
+        
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        if (competitor.website) doc.text(`Website: ${competitor.website}`, 25, yPosition);
+        yPosition += 6;
+        
+        if (competitor.overview && competitor.overview.description) {
+          doc.text(`Overview: ${competitor.overview.description}`, 25, yPosition);
+          yPosition += 6;
+        }
+        
+        if (competitor.overview) {
+          if (competitor.overview.founded) {
+            doc.text(`Founded: ${competitor.overview.founded}`, 25, yPosition);
+            yPosition += 6;
+          }
+          if (competitor.overview.employees) {
+            doc.text(`Employees: ${competitor.overview.employees}`, 25, yPosition);
+            yPosition += 6;
+          }
+          if (competitor.overview.revenue) {
+            doc.text(`Revenue: ${competitor.overview.revenue}`, 25, yPosition);
+            yPosition += 6;
+          }
+        }
+        
+        if (competitor.digital_presence) {
+          doc.text(`Website Traffic: ${formatNumber(competitor.digital_presence.website_traffic || 0)}/month`, 25, yPosition);
+          yPosition += 6;
+          doc.text(`SEO Score: ${competitor.digital_presence.seo_score || 0}/100`, 25, yPosition);
+          yPosition += 6;
+          doc.text(`Domain Authority: ${competitor.digital_presence.domain_authority || 0}`, 25, yPosition);
+          yPosition += 6;
+        }
+        
+        // SWOT Analysis
+        if (competitor.strengths && competitor.strengths.length > 0) {
+          doc.text("Strengths:", 25, yPosition);
+          yPosition += 6;
+          competitor.strengths.forEach((strength: string) => {
+            doc.text(`• ${strength}`, 30, yPosition);
+            yPosition += 5;
+          });
+        }
+        
+        if (competitor.weaknesses && competitor.weaknesses.length > 0) {
+          doc.text("Weaknesses:", 25, yPosition);
+          yPosition += 6;
+          competitor.weaknesses.forEach((weakness: string) => {
+            doc.text(`• ${weakness}`, 30, yPosition);
+            yPosition += 5;
+          });
+        }
+        
+        yPosition += 10;
+      });
+    }
+    
+    // Competitive Gaps
+    if (result.competitive_gaps && result.competitive_gaps.length > 0) {
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text("Competitive Gaps", 20, yPosition);
+      yPosition += 10;
+      
+      result.competitive_gaps.forEach((gap: any) => {
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.text(`${gap.category}: ${gap.opportunity}`, 20, yPosition);
+        yPosition += 8;
+        
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Difficulty: ${gap.difficulty} | Impact: ${gap.impact}`, 25, yPosition);
+        yPosition += 8;
+      });
+      yPosition += 10;
+    }
+    
+    // Recommendations
+    if (result.recommendations && result.recommendations.length > 0) {
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text("Strategic Recommendations", 20, yPosition);
+      yPosition += 10;
+      
+      result.recommendations.forEach((rec: any, index: number) => {
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.text(`${index + 1}. ${rec.action}`, 20, yPosition);
+        yPosition += 8;
+        
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Category: ${rec.category}`, 25, yPosition);
+        yPosition += 6;
+        doc.text(`Priority: ${rec.priority}`, 25, yPosition);
+        yPosition += 6;
+        doc.text(`Timeline: ${rec.timeline}`, 25, yPosition);
+        yPosition += 6;
+        doc.text(`Rationale: ${rec.rationale}`, 25, yPosition);
+        yPosition += 8;
+      });
+    }
+    
+    // Benchmarking
+    if (result.benchmarking) {
+      doc.addPage();
+      yPosition = 20;
+      
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text("Benchmarking Analysis", 20, yPosition);
+      yPosition += 10;
+      
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Your Position: ${result.benchmarking.your_position || "N/A"}`, 20, yPosition);
+      yPosition += 15;
+      
+      if (result.benchmarking.key_metrics_comparison && result.benchmarking.key_metrics_comparison.length > 0) {
+        doc.text("Key Metrics Comparison:", 20, yPosition);
+        yPosition += 10;
+        
+        result.benchmarking.key_metrics_comparison.forEach((metric: any) => {
+          doc.text(`${metric.metric}:`, 25, yPosition);
+          yPosition += 6;
+          doc.text(`  Your Score: ${metric.your_score}`, 30, yPosition);
+          yPosition += 6;
+          doc.text(`  Competitor Avg: ${metric.competitor_avg}`, 30, yPosition);
+          yPosition += 6;
+          doc.text(`  Industry Avg: ${metric.industry_avg}`, 30, yPosition);
+          yPosition += 8;
+        });
+      }
+    }
+    
+    doc.save("competitor-analysis-report.pdf");
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -858,9 +1063,9 @@ export default function CompetitorAnalysisPage() {
                     {copied ? <CheckCircle className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
                     {copied ? "Copied!" : "Copy Full Analysis"}
                   </Button>
-                  <Button variant="outline" className="flex-1 bg-transparent">
+                  <Button variant="outline" onClick={handleDownloadPDF}>
                     <Download className="w-4 h-4 mr-2" />
-                    Download Competitive Report
+                    Download PDF
                   </Button>
                 </div>
               </div>

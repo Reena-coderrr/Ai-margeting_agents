@@ -12,6 +12,7 @@ import { Header } from "@/components/header"
 import Link from "next/link"
 import { ArrowLeft, Play, Download, Copy, CheckCircle, Loader2, MapPin, Lock, Crown, Star, TrendingUp, Search, Users } from 'lucide-react'
 import { useUserStore } from "@/lib/user-store"
+import jsPDF from "jspdf";
 
 interface LocalSEOResult {
   businessProfile: {
@@ -477,6 +478,32 @@ The ${formData.businessName} Team`,
     setCopied((prev) => ({ ...prev, [id]: true }))
     setTimeout(() => setCopied((prev) => ({ ...prev, [id]: false })), 2000)
   }
+
+  const handleDownloadPDF = () => {
+    if (!result) return;
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("Local SEO Plan", 10, 15);
+    doc.setFontSize(12);
+    if (result.actionPlan && Array.isArray(result.actionPlan)) {
+      result.actionPlan.forEach((phase, i) => {
+        doc.text(`${phase.phase}:`, 10, 25 + i * 30);
+        if (phase.tasks && Array.isArray(phase.tasks)) {
+          doc.text("Tasks:", 12, 32 + i * 30);
+          phase.tasks.forEach((task, j) => {
+            doc.text(`- ${task}`, 14, 38 + i * 30 + j * 6);
+          });
+        }
+        if (phase.expectedResults && Array.isArray(phase.expectedResults)) {
+          doc.text("Expected Results:", 80, 32 + i * 30);
+          phase.expectedResults.forEach((res, k) => {
+            doc.text(`- ${res}`, 82, 38 + i * 30 + k * 6);
+          });
+        }
+      });
+    }
+    doc.save("local-seo-plan.pdf");
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1085,7 +1112,7 @@ The ${formData.businessName} Team`,
                     )}
                     {copied["all-local-seo"] ? "Copied!" : "Copy Full Report"}
                   </Button>
-                  <Button variant="outline" className="flex-1 bg-transparent">
+                  <Button variant="outline" onClick={handleDownloadPDF} className="flex-1">
                     <Download className="w-4 h-4 mr-2" />
                     Export SEO Plan
                   </Button>

@@ -16,12 +16,12 @@ export function Footer() {
             <h4 className="font-semibold mb-4">Product</h4>
             <ul className="space-y-2 text-gray-400">
               <li>
-                <Link href="#" className="hover:text-white transition-colors">
+                <Link href="/features" className="hover:text-white transition-colors">
                   Features
                 </Link>
               </li>
               <li>
-                <Link href="#pricing" className="hover:text-white transition-colors">
+                <Link href="/pricing" className="hover:text-white transition-colors">
                   Pricing
                 </Link>
               </li>
@@ -33,12 +33,12 @@ export function Footer() {
             <h4 className="font-semibold mb-4">Company</h4>
             <ul className="space-y-2 text-gray-400">
               <li>
-                <Link href="#" className="hover:text-white transition-colors">
+                <Link href="/about" className="hover:text-white transition-colors">
                   About
                 </Link>
               </li>
               <li>
-                <Link href="#" className="hover:text-white transition-colors">
+                <Link href="/blog" className="hover:text-white transition-colors">
                   Blog
                 </Link>
               </li>
@@ -59,7 +59,7 @@ export function Footer() {
                 </Link>
               </li> */}
               <li>
-                <Link href="#" className="hover:text-white transition-colors">
+                <Link href="/contact" className="hover:text-white transition-colors">
                   Contact
                 </Link>
               </li>

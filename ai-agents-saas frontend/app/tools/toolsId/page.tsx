@@ -13,6 +13,7 @@ import Link from "next/link"
 import { ArrowLeft, Play, Download, Copy, CheckCircle, Loader2, Lock, Crown } from "lucide-react"
 import { useParams } from "next/navigation"
 import { useUserStore } from "@/lib/user-store"
+import jsPDF from "jspdf";
 
 interface ToolInput {
   name: string
@@ -456,6 +457,18 @@ export default function ToolPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const handleDownloadPDF = () => {
+    if (!result) return;
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("Tool Report", 10, 15);
+    doc.setFontSize(12);
+    doc.text(`Tool: ${toolId || "N/A"}`, 10, 25);
+    doc.text("Results:", 10, 35);
+    doc.text(JSON.stringify(result, null, 2), 12, 45);
+    doc.save("tool-report.pdf");
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -652,7 +665,7 @@ export default function ToolPage() {
                       <Copy className="w-4 h-4 mr-2" />
                       Copy Results
                     </Button>
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={handleDownloadPDF}>
                       <Download className="w-4 h-4 mr-2" />
                       Download Report
                     </Button>

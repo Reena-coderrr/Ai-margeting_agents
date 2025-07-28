@@ -11,6 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select } from "@/components/ui/select";
 import { useRouter } from "next/navigation";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { useToast } from "@/components/ui/use-toast";
 
 type User = {
   _id: string;
@@ -18,9 +20,26 @@ type User = {
   lastName: string;
   email: string;
   company?: string;
-  plan?: string;
-  status?: string;
-  usage?: number;
+  subscription?: {
+    plan: string;
+    status: string;
+    trialStartDate?: string;
+    trialEndDate?: string;
+    subscriptionStartDate?: string;
+    subscriptionEndDate?: string;
+  };
+  usage?: {
+    totalGenerations: number;
+    monthlyGenerations: number;
+    lastResetDate: string;
+    toolsUsed: Array<{
+      toolId: string;
+      toolName: string;
+      usageCount: number;
+      lastUsed: string;
+    }>;
+  };
+  lastLogin?: string;
   lastActive?: string;
 };
 
@@ -40,51 +59,128 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [showPlanFilter, setShowPlanFilter] = useState(false);
   const router = useRouter();
+  const { toast } = useToast();
+  const [settings, setSettings] = useState<any>(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
       try {
         const [statsRes, usersRes, subsRes, analyticsRes] = await Promise.all([
-          fetch("/api/admin/dashboard-stats"),
-          fetch("/api/admin/users"),
-          fetch("/api/admin/subscriptions/overview"),
-          fetch("/api/admin/analytics"),
+          fetch("http://localhost:5000/api/admin/dashboard-stats"),
+          fetch("http://localhost:5000/api/admin/users"),
+          fetch("http://localhost:5000/api/admin/subscriptions/overview"),
+          fetch("http://localhost:5000/api/admin/analytics"),
         ]);
         setStats(await statsRes.json());
         setUsers(await usersRes.json());
         setSubscriptions(await subsRes.json());
         setAnalytics(await analyticsRes.json());
       } catch (err) {
-        // handle error
+        console.error("Error fetching admin data:", err);
       }
       setLoading(false);
     }
     fetchData();
   }, []);
 
+  // Fetch settings when Settings tab is opened
+  useEffect(() => {
+    async function fetchSettings() {
+      setSettingsLoading(true);
+      try {
+        const res = await fetch("http://localhost:5000/api/admin/settings");
+        const data = await res.json();
+        setSettings(data);
+      } catch (err) {
+        toast({ title: "Error", description: "Failed to load settings", variant: "destructive" });
+      }
+      setSettingsLoading(false);
+    }
+    // Only fetch if not already loaded
+    if (!settings) fetchSettings();
+  }, [settings, toast]);
+
+  // Handler for updating settings fields
+  function updateSetting(path: string, value: any) {
+    setSettings((prev: any) => {
+      if (!prev) return prev;
+      const newSettings = { ...prev };
+      // Support dot notation for nested fields
+      const keys = path.split(".");
+      let obj = newSettings;
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (!obj[keys[i]]) obj[keys[i]] = {};
+        obj = obj[keys[i]];
+      }
+      obj[keys[keys.length - 1]] = value;
+      return newSettings;
+    });
+  }
+
+  async function saveSettings() {
+    setSettingsSaving(true);
+    try {
+      const res = await fetch("http://localhost:5000/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+      if (!res.ok) throw new Error("Failed to save settings");
+      const data = await res.json();
+      setSettings(data);
+      toast({ title: "Settings saved", description: "Settings updated successfully." });
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to save settings", variant: "destructive" });
+    }
+    setSettingsSaving(false);
+  }
+
   const filteredUsers = users.filter(
     (user) =>
       ((user.firstName + " " + user.lastName).toLowerCase().includes(searchTerm.toLowerCase()) ||
         (user.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         (user.company || "").toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (planFilter ? user.plan === planFilter : true) &&
-      (statusFilter ? user.status === statusFilter : true)
+      (planFilter ? user.subscription?.plan === planFilter : true) &&
+      (statusFilter ? user.subscription?.status === statusFilter : true)
   );
 
   const getPlanColor = (plan: string) => {
     switch (plan) {
-      case "Free Trial":
+      case "free_trial":
         return "bg-orange-100 text-orange-800"
-      case "Starter":
+      case "starter":
         return "bg-blue-100 text-blue-800"
-      case "Pro":
+      case "pro":
         return "bg-purple-100 text-purple-800"
-      case "Agency":
+      case "agency":
         return "bg-green-100 text-green-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
+  }
+
+  function getLastActive(user: User) {
+    const lastLogin = user.lastLogin ? new Date(user.lastLogin) : null;
+    const lastToolUsed = user.usage?.toolsUsed?.length
+      ? new Date(
+          Math.max(
+            ...user.usage.toolsUsed
+              .filter(t => t.lastUsed)
+              .map(t => new Date(t.lastUsed).getTime())
+          )
+        )
+      : null;
+
+    const mostRecent = [lastLogin, lastToolUsed]
+      .filter(Boolean)
+      .sort((a, b) => (b as Date).getTime() - (a as Date).getTime())[0];
+
+    return mostRecent
+      ? mostRecent.toLocaleString()
+      : "Never";
   }
 
   return (
@@ -198,22 +294,40 @@ export default function AdminPage() {
                     />
                   </div>
                   <div className="relative">
-                    <Button variant="outline" onClick={() => setShowPlanFilter((v) => !v)} className="flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowPlanFilter((v) => !v)} 
+                      className={`flex items-center gap-2 ${planFilter ? 'border-blue-500 bg-blue-50' : ''}`}
+                    >
                       <Filter className="w-4 h-4 mr-1" />
                       Filter
+                      {planFilter && (
+                        <Badge variant="secondary" className="ml-1 text-xs bg-blue-100 text-blue-800">
+                          {planFilter === 'free_trial' ? 'Free Trial' : 
+                           planFilter === 'starter' ? 'Starter' : 
+                           planFilter === 'pro' ? 'Pro' : 
+                           planFilter === 'agency' ? 'Agency' : planFilter}
+                        </Badge>
+                      )}
                     </Button>
                     {showPlanFilter && (
                       <div className="absolute right-0 z-20 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none border border-gray-200 animate-fade-in">
-                        {['All Plans', 'Free Trial', 'Starter', 'Pro', 'Agency'].map((plan) => (
+                        {[
+                          { value: '', label: 'All Plans' },
+                          { value: 'free_trial', label: 'Free Trial' },
+                          { value: 'starter', label: 'Starter' },
+                          { value: 'pro', label: 'Pro' },
+                          { value: 'agency', label: 'Agency' }
+                        ].map((plan) => (
                           <button
-                            key={plan}
-                            className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 focus:bg-blue-100 transition-colors ${planFilter === (plan === 'All Plans' ? '' : plan) ? 'font-bold text-blue-700' : 'text-gray-700'}`}
+                            key={plan.value}
+                            className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 focus:bg-blue-100 transition-colors ${planFilter === plan.value ? 'font-bold text-blue-700' : 'text-gray-700'}`}
                             onClick={() => {
-                              setPlanFilter(plan === 'All Plans' ? '' : plan);
+                              setPlanFilter(plan.value);
                               setShowPlanFilter(false);
                             }}
                           >
-                            {plan}
+                            {plan.label}
                           </button>
                         ))}
                       </div>
@@ -252,15 +366,15 @@ export default function AdminPage() {
                         </TableCell>
                         <TableCell>{user.company}</TableCell>
                         <TableCell>
-                          <Badge className={getPlanColor(user.plan || "")}>{user.plan}</Badge>
+                          <Badge className={getPlanColor(user.subscription?.plan || "")}>{user.subscription?.plan || "No Plan"}</Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="bg-green-100 text-green-800">
-                            {user.status}
+                            {user.subscription?.status || "Unknown"}
                           </Badge>
                         </TableCell>
-                        <TableCell>{user.usage} generations</TableCell>
-                        <TableCell>{user.lastActive}</TableCell>
+                        <TableCell>{user.usage?.totalGenerations || 0} generations</TableCell>
+                        <TableCell>{getLastActive(user)}</TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -426,10 +540,365 @@ export default function AdminPage() {
                 <CardDescription>Configure platform-wide settings and preferences</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="text-center py-12">
-                  <Crown className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Admin Settings</h3>
-                  <p className="text-gray-600">Platform configuration options will be available here</p>
+                <Accordion type="multiple" className="w-full">
+                  {/* 1. Platform Configuration */}
+                  <AccordionItem value="platform-config">
+                    <AccordionTrigger>Platform Configuration</AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-4">
+                        {/* System Settings */}
+                        <div>
+                          <h4 className="font-semibold">System Settings</h4>
+                          <div className="flex flex-col gap-2 max-w-md">
+                            <label className="text-sm font-medium">DB Connection</label>
+                            <input
+                              className="border rounded px-2 py-1"
+                              type="text"
+                              value={settings?.platform?.dbConnection || ""}
+                              onChange={e => updateSetting("platform.dbConnection", e.target.value)}
+                              disabled={settingsLoading}
+                            />
+                            <label className="text-sm font-medium mt-2">API Keys</label>
+                            {(settings?.platform?.apiKeys || []).map((key: string, idx: number) => (
+                              <div key={idx} className="flex gap-2 items-center">
+                                <input
+                                  className="border rounded px-2 py-1 flex-1"
+                                  type="text"
+                                  value={key}
+                                  onChange={e => {
+                                    const newKeys = [...settings.platform.apiKeys];
+                                    newKeys[idx] = e.target.value;
+                                    updateSetting("platform.apiKeys", newKeys);
+                                  }}
+                                  disabled={settingsLoading}
+                                />
+                                <Button size="sm" variant="destructive" onClick={() => {
+                                  const newKeys = settings.platform.apiKeys.filter((_: any, i: number) => i !== idx);
+                                  updateSetting("platform.apiKeys", newKeys);
+                                }}>Remove</Button>
+                              </div>
+                            ))}
+                            <Button size="sm" onClick={() => updateSetting("platform.apiKeys", [...(settings?.platform?.apiKeys || []), ""])}>Add API Key</Button>
+                            <label className="text-sm font-medium mt-2">Environment Variables</label>
+                            {settings?.platform?.envVars && Object.entries(settings.platform.envVars).map(([k, v]: [string, string], idx: number) => (
+                              <div key={k} className="flex gap-2 items-center">
+                                <input
+                                  className="border rounded px-2 py-1 flex-1"
+                                  type="text"
+                                  value={k}
+                                  onChange={e => {
+                                    const newVars = { ...settings.platform.envVars };
+                                    const val = newVars[k];
+                                    delete newVars[k];
+                                    newVars[e.target.value] = val;
+                                    updateSetting("platform.envVars", newVars);
+                                  }}
+                                  disabled={settingsLoading}
+                                />
+                                <input
+                                  className="border rounded px-2 py-1 flex-1"
+                                  type="text"
+                                  value={v}
+                                  onChange={e => {
+                                    const newVars = { ...settings.platform.envVars };
+                                    newVars[k] = e.target.value;
+                                    updateSetting("platform.envVars", newVars);
+                                  }}
+                                  disabled={settingsLoading}
+                                />
+                                <Button size="sm" variant="destructive" onClick={() => {
+                                  const newVars = { ...settings.platform.envVars };
+                                  delete newVars[k];
+                                  updateSetting("platform.envVars", newVars);
+                                }}>Remove</Button>
+                              </div>
+                            ))}
+                            <Button size="sm" onClick={() => updateSetting("platform.envVars", { ...settings.platform.envVars, "": "" })}>Add Env Var</Button>
+                          </div>
+                        </div>
+                        {/* Payment Settings */}
+                        <div>
+                          <h4 className="font-semibold">Payment Settings</h4>
+                          <div className="flex flex-col gap-2 max-w-md">
+                            <label className="text-sm font-medium">Stripe Key</label>
+                            <input
+                              className="border rounded px-2 py-1"
+                              type="text"
+                              value={settings?.platform?.payment?.stripe || ""}
+                              onChange={e => updateSetting("platform.payment.stripe", e.target.value)}
+                              disabled={settingsLoading}
+                            />
+                            <label className="text-sm font-medium mt-2">Subscription Plans</label>
+                            {(settings?.platform?.payment?.plans || []).map((plan: any, idx: number) => (
+                              <div key={idx} className="border p-2 rounded mb-2">
+                                <input
+                                  className="border rounded px-2 py-1 mb-1"
+                                  type="text"
+                                  value={plan.name}
+                                  placeholder="Plan Name"
+                                  onChange={e => {
+                                    const newPlans = [...settings.platform.payment.plans];
+                                    newPlans[idx].name = e.target.value;
+                                    updateSetting("platform.payment.plans", newPlans);
+                                  }}
+                                  disabled={settingsLoading}
+                                />
+                                <input
+                                  className="border rounded px-2 py-1 mb-1"
+                                  type="number"
+                                  value={plan.price}
+                                  placeholder="Price"
+                                  onChange={e => {
+                                    const newPlans = [...settings.platform.payment.plans];
+                                    newPlans[idx].price = Number(e.target.value);
+                                    updateSetting("platform.payment.plans", newPlans);
+                                  }}
+                                  disabled={settingsLoading}
+                                />
+                                <div className="flex flex-wrap gap-2 mb-1">
+                                  {(settings?.aiTools?.enabledTools || []).map((tool: string) => (
+                                    <label key={tool} className="flex items-center gap-1">
+                                      <input
+                                        type="checkbox"
+                                        checked={plan.features?.includes(tool)}
+                                        onChange={e => {
+                                          const newPlans = [...settings.platform.payment.plans];
+                                          if (e.target.checked) {
+                                            newPlans[idx].features = [...(plan.features || []), tool];
+                                          } else {
+                                            newPlans[idx].features = (plan.features || []).filter((f: string) => f !== tool);
+                                          }
+                                          updateSetting("platform.payment.plans", newPlans);
+                                        }}
+                                        disabled={settingsLoading}
+                                      />
+                                      {tool}
+                                    </label>
+                                  ))}
+                                </div>
+                                <Button size="sm" variant="destructive" onClick={() => {
+                                  const newPlans = settings.platform.payment.plans.filter((_: any, i: number) => i !== idx);
+                                  updateSetting("platform.payment.plans", newPlans);
+                                }}>Remove Plan</Button>
+                              </div>
+                            ))}
+                            <Button size="sm" onClick={() => updateSetting("platform.payment.plans", [...(settings?.platform?.payment?.plans || []), { name: "", price: 0, features: [] }])}>Add Plan</Button>
+                          </div>
+                        </div>
+                        {/* Security Settings */}
+                        <div>
+                          <h4 className="font-semibold">Security Settings</h4>
+                          <div className="flex flex-col gap-2 max-w-md">
+                            <label className="text-sm font-medium">Password Min Length</label>
+                            <input
+                              className="border rounded px-2 py-1"
+                              type="number"
+                              value={settings?.platform?.security?.passwordPolicy?.minLength || 8}
+                              onChange={e => updateSetting("platform.security.passwordPolicy.minLength", Number(e.target.value))}
+                              disabled={settingsLoading}
+                            />
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={!!settings?.platform?.security?.passwordPolicy?.requireNumbers}
+                                onChange={e => updateSetting("platform.security.passwordPolicy.requireNumbers", e.target.checked)}
+                                disabled={settingsLoading}
+                              />
+                              Require Numbers
+                            </label>
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={!!settings?.platform?.security?.passwordPolicy?.requireSpecial}
+                                onChange={e => updateSetting("platform.security.passwordPolicy.requireSpecial", e.target.checked)}
+                                disabled={settingsLoading}
+                              />
+                              Require Special Characters
+                            </label>
+                            <label className="text-sm font-medium">Session Timeout (minutes)</label>
+                            <input
+                              className="border rounded px-2 py-1"
+                              type="number"
+                              value={settings?.platform?.security?.sessionTimeout || 30}
+                              onChange={e => updateSetting("platform.security.sessionTimeout", Number(e.target.value))}
+                              disabled={settingsLoading}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                  {/* 2. User Management Settings */}
+                  <AccordionItem value="user-management">
+                    <AccordionTrigger>User Management Settings</AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-4">
+                        {/* Registration Settings */}
+                        <div>
+                          <h4 className="font-semibold">Registration Settings</h4>
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm font-medium">Enable Registration</label>
+                            <input
+                              type="checkbox"
+                              checked={!!settings?.userManagement?.registrationEnabled}
+                              onChange={e => updateSetting("userManagement.registrationEnabled", e.target.checked)}
+                              disabled={settingsLoading}
+                            />
+                          </div>
+                        </div>
+                        {/* Trial Settings */}
+                        <div>
+                          <h4 className="font-semibold">Trial Settings</h4>
+                          <div className="flex flex-col gap-2 max-w-md">
+                            <label className="text-sm font-medium">Default Trial Duration (days)</label>
+                            <input
+                              className="border rounded px-2 py-1"
+                              type="number"
+                              value={settings?.userManagement?.trial?.durationDays || 7}
+                              onChange={e => updateSetting("userManagement.trial.durationDays", Number(e.target.value))}
+                              disabled={settingsLoading}
+                            />
+                            <label className="text-sm font-medium">Trial Usage Limit</label>
+                            <input
+                              className="border rounded px-2 py-1"
+                              type="number"
+                              value={settings?.userManagement?.trial?.usageLimit || 100}
+                              onChange={e => updateSetting("userManagement.trial.usageLimit", Number(e.target.value))}
+                              disabled={settingsLoading}
+                            />
+                          </div>
+                        </div>
+                        {/* Plan Settings */}
+                        <div>
+                          <h4 className="font-semibold">Plan Settings</h4>
+                          <div className="flex flex-col gap-2 max-w-md">
+                            {(settings?.userManagement?.plans || []).map((plan: any, idx: number) => (
+                              <div key={idx} className="border p-2 rounded mb-2">
+                                <input
+                                  className="border rounded px-2 py-1 mb-1"
+                                  type="text"
+                                  value={plan.name}
+                                  placeholder="Plan Name"
+                                  onChange={e => {
+                                    const newPlans = [...settings.userManagement.plans];
+                                    newPlans[idx].name = e.target.value;
+                                    updateSetting("userManagement.plans", newPlans);
+                                  }}
+                                  disabled={settingsLoading}
+                                />
+                                <input
+                                  className="border rounded px-2 py-1 mb-1"
+                                  type="number"
+                                  value={plan.price}
+                                  placeholder="Price"
+                                  onChange={e => {
+                                    const newPlans = [...settings.userManagement.plans];
+                                    newPlans[idx].price = Number(e.target.value);
+                                    updateSetting("userManagement.plans", newPlans);
+                                  }}
+                                  disabled={settingsLoading}
+                                />
+                                <div className="flex flex-wrap gap-2 mb-1">
+                                  {(settings?.aiTools?.enabledTools || []).map((tool: string) => (
+                                    <label key={tool} className="flex items-center gap-1">
+                                      <input
+                                        type="checkbox"
+                                        checked={plan.features?.includes(tool)}
+                                        onChange={e => {
+                                          const newPlans = [...settings.userManagement.plans];
+                                          if (e.target.checked) {
+                                            newPlans[idx].features = [...(plan.features || []), tool];
+                                          } else {
+                                            newPlans[idx].features = (plan.features || []).filter((f: string) => f !== tool);
+                                          }
+                                          updateSetting("userManagement.plans", newPlans);
+                                        }}
+                                        disabled={settingsLoading}
+                                      />
+                                      {tool}
+                                    </label>
+                                  ))}
+                                </div>
+                                <Button size="sm" variant="destructive" onClick={() => {
+                                  const newPlans = settings.userManagement.plans.filter((_: any, i: number) => i !== idx);
+                                  updateSetting("userManagement.plans", newPlans);
+                                }}>Remove Plan</Button>
+                              </div>
+                            ))}
+                            <Button size="sm" onClick={() => updateSetting("userManagement.plans", [...(settings?.userManagement?.plans || []), { name: "", price: 0, features: [] }])}>Add Plan</Button>
+                          </div>
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                  {/* 3. AI Tool Settings */}
+                  <AccordionItem value="ai-tool-settings">
+                    <AccordionTrigger>AI Tool Settings</AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-4">
+                        {/* Usage Limits */}
+                        <div>
+                          <h4 className="font-semibold">Usage Limits</h4>
+                          <div className="flex flex-col gap-2 max-w-md">
+                            {Object.entries(settings?.aiTools?.usageLimits || {}).map(([plan, limit]: [string, number]) => (
+                              <div key={plan} className="flex items-center gap-2">
+                                <label className="text-sm font-medium capitalize">{plan.replace("_", " ")}</label>
+                                <input
+                                  className="border rounded px-2 py-1"
+                                  type="number"
+                                  value={limit}
+                                  onChange={e => {
+                                    const newLimits = { ...settings.aiTools.usageLimits, [plan]: Number(e.target.value) };
+                                    updateSetting("aiTools.usageLimits", newLimits);
+                                  }}
+                                  disabled={settingsLoading}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        {/* Tool Configuration */}
+                        <div>
+                          <h4 className="font-semibold">Tool Configuration</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {(settings?.aiTools?.enabledTools || []).map((tool: string, idx: number) => (
+                              <label key={tool} className="flex items-center gap-1">
+                                <input
+                                  type="checkbox"
+                                  checked={settings.aiTools.enabledTools.includes(tool)}
+                                  onChange={e => {
+                                    let newTools = [...settings.aiTools.enabledTools];
+                                    if (e.target.checked) {
+                                      if (!newTools.includes(tool)) newTools.push(tool);
+                                    } else {
+                                      newTools = newTools.filter((t: string) => t !== tool);
+                                    }
+                                    updateSetting("aiTools.enabledTools", newTools);
+                                  }}
+                                  disabled={settingsLoading}
+                                />
+                                {tool}
+                                <Button size="sm" variant="destructive" onClick={() => {
+                                  const newTools = settings.aiTools.enabledTools.filter((_: string, i: number) => i !== idx);
+                                  updateSetting("aiTools.enabledTools", newTools);
+                                }}>Remove</Button>
+                              </label>
+                            ))}
+                            <Button size="sm" onClick={() => updateSetting("aiTools.enabledTools", [...(settings?.aiTools?.enabledTools || []), ""])}>Add Tool</Button>
+                          </div>
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+                <div className="flex justify-end mt-6">
+                  <button
+                    className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                    onClick={saveSettings}
+                    disabled={settingsLoading || settingsSaving}
+                  >
+                    {settingsSaving ? "Saving..." : "Save Settings"}
+                  </button>
                 </div>
               </CardContent>
             </Card>

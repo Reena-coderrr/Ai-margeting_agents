@@ -37,7 +37,7 @@ export default function LoginPage() {
         return;
       }
       localStorage.setItem("authToken", data.token);
-      // Optionally store user data: localStorage.setItem("userData", JSON.stringify(data.user));
+      localStorage.setItem("user", JSON.stringify(data.user));
       router.push("/dashboard");
     } catch (err) {
       setError("Network error");

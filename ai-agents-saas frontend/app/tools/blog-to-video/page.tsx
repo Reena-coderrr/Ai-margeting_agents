@@ -12,6 +12,7 @@ import { Header } from "@/components/header"
 import Link from "next/link"
 import { ArrowLeft, Play, Download, Copy, CheckCircle, Loader2, Video, Lock, Crown, Clock, Eye, Camera, Mic } from 'lucide-react'
 import { useUserStore } from "@/lib/user-store"
+import jsPDF from "jspdf";
 
 interface VideoScript {
   section: string
@@ -52,6 +53,8 @@ interface VideoResult {
     engagementPrediction: string
     platformRecommendations: string[]
   }
+  platformStrategy?: string[];
+  thumbnailConcept?: string;
 }
 
 export default function BlogToVideoPage() {
@@ -349,6 +352,13 @@ Timestamps:
           "TikTok - Quick tips format",
         ],
       },
+      platformStrategy: [
+        "YouTube (primary) - Long-form educational content",
+        "LinkedIn - Professional audience",
+        "Instagram Reels - Condensed version",
+        "TikTok - Quick tips format",
+      ],
+      thumbnailConcept: `Split design: Problem (left) vs Solution (right) with bold text overlay: "${formData.blogTitle}" and host photo in corner`,
     }
 
     setResult(mockResult)
@@ -360,6 +370,25 @@ Timestamps:
     setCopied((prev) => ({ ...prev, [id]: true }))
     setTimeout(() => setCopied((prev) => ({ ...prev, [id]: false })), 2000)
   }
+
+  const handleDownloadPDF = () => {
+    if (!result) return;
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("Production Guide", 10, 15);
+    doc.setFontSize(12);
+    if (result.platformStrategy && Array.isArray(result.platformStrategy)) {
+      doc.text("Platform Strategy:", 10, 25);
+      result.platformStrategy.forEach((item, i) => {
+        doc.text(`- ${item}`, 12, 32 + i * 7);
+      });
+    }
+    if (result.thumbnailConcept) {
+      doc.text("Thumbnail Concept:", 10, 60);
+      doc.text(result.thumbnailConcept, 12, 67);
+    }
+    doc.save("production-guide.pdf");
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -848,7 +877,7 @@ Timestamps:
                     )}
                     {copied["all-video"] ? "Copied!" : "Copy Full Script"}
                   </Button>
-                  <Button variant="outline" className="flex-1 bg-transparent">
+                  <Button variant="outline" onClick={handleDownloadPDF}>
                     <Download className="w-4 h-4 mr-2" />
                     Export Production Guide
                   </Button>

@@ -31,7 +31,7 @@ const allTools = [
   {
     id: "seo-audit",
     title: "SEO Audit Tool",
-    description: "Comprehensive website SEO analysis with actionable insights and downloadable reports",
+    description: "Comprehensive technical SEO analysis with detailed performance insights and actionable recommendations",
     icon: Search,
     color: "from-green-400 to-emerald-600",
     shadowColor: "#34D399", // Tailwind emerald-400

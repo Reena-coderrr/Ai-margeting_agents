@@ -199,18 +199,12 @@ router.post("/login", validateLogin, async (req, res) => {
     await user.save()
 
     // Generate token
-    const token = generateToken(user._id, user.role)
-
-    // Remove password from response
     const userResponse = user.toObject()
     delete userResponse.password
 
-    // Clear rate limiting on successful login
-    loginAttempts.delete(email)
-
     res.json({
       message: "Login successful",
-      token,
+      token: generateToken(user._id, user.role),
       user: userResponse,
     })
   } catch (error) {

@@ -26,6 +26,7 @@ import {
   Eye,
 } from "lucide-react"
 import { useUserStore } from "@/lib/user-store"
+import jsPDF from "jspdf";
 
 interface BlogResult {
   title: string
@@ -39,7 +40,7 @@ interface BlogResult {
     primary: string
     secondary: string[]
     density: number
-  }
+  }[]
   suggestions: {
     improvements: string[]
     additionalSections: string[]
@@ -80,54 +81,21 @@ export default function BlogWritingPage() {
     }
 
     setIsGenerating(true)
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 5000))
-
-    // Mock comprehensive blog writing results
-    const mockResult: BlogResult = {
-      title: formData.title || "The Ultimate Guide to AI-Powered Marketing",
-      metaDescription: `Discover how ${formData.keywords || "AI marketing"} can transform your business. Learn proven strategies, tools, and techniques to boost your marketing ROI by 300%.`,
-      content: generateBlogContent(formData.title, formData.keywords, formData.audience),
-      outline: [
-        "Introduction: The AI Marketing Revolution",
-        "Understanding AI in Modern Marketing",
-        "Key Benefits of AI Marketing Tools",
-        "Top AI Marketing Strategies for 2024",
-        "Implementation Guide: Getting Started",
-        "Measuring Success: KPIs and Analytics",
-        "Common Challenges and Solutions",
-        "Future Trends in AI Marketing",
-        "Conclusion and Next Steps",
-      ],
-      wordCount: Math.floor(Math.random() * 1000) + 1500,
-      readingTime: `${Math.floor((Math.floor(Math.random() * 1000) + 1500) / 200)} min read`,
-      seoScore: Math.floor(Math.random() * 20) + 80,
-      keywords: {
-        primary: formData.keywords.split(",")[0]?.trim() || "AI marketing",
-        secondary: formData.keywords
-          .split(",")
-          .slice(1)
-          .map((k) => k.trim()) || ["marketing automation", "digital marketing", "AI tools"],
-        density: Math.round((Math.random() * 1.5 + 1.5) * 10) / 10,
+    const token = localStorage.getItem("authToken")
+    const res = await fetch("http://localhost:5000/api/ai-tools/blog-writing/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
-      suggestions: {
-        improvements: [
-          "Add more internal links to related content",
-          "Include more data and statistics",
-          "Add FAQ section for better user engagement",
-          "Consider adding video content or infographics",
-        ],
-        additionalSections: [
-          "Case studies and success stories",
-          "Tool comparison table",
-          "Step-by-step tutorial",
-          "Expert interviews and quotes",
-        ],
-      },
+      body: JSON.stringify({ input: formData }),
+    })
+    const data = await res.json()
+    if (res.ok) {
+      setResult(data.output)
+    } else {
+      alert(data.message || "Failed to generate content")
     }
-
-    setResult(mockResult)
     setIsGenerating(false)
   }
 
@@ -254,6 +222,17 @@ Ready to transform your marketing with AI? Start implementing these strategies t
     if (score >= 60) return "bg-yellow-100"
     return "bg-red-100"
   }
+
+  const handleDownloadPDF = () => {
+    if (!result) return;
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("Blog Content", 10, 15);
+    doc.setFontSize(12);
+    doc.text(result.title || "Untitled Blog", 10, 25);
+    doc.text(result.content || "No content available.", 10, 35, { maxWidth: 180 });
+    doc.save("blog-content.pdf");
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -476,10 +455,16 @@ Ready to transform your marketing with AI? Start implementing these strategies t
                         </div>
                         <div className="text-sm text-gray-600">SEO Score</div>
                       </div>
-                      <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                        <div className="text-2xl font-bold text-yellow-600">{result.keywords.density}%</div>
-                        <div className="text-sm text-gray-600">Keyword Density</div>
-                      </div>
+                      {result.keywords && Array.isArray(result.keywords) && result.keywords.length > 0 && (
+                        <div>
+                          {result.keywords.map((kw: { primary: string; secondary: string[]; density: number }, idx: number) => (
+                            <div key={idx} className="text-center p-3 bg-yellow-50 rounded-lg mb-2">
+                              <div className="text-2xl font-bold text-yellow-600">{kw.density}%</div>
+                              <div className="text-sm text-gray-600">{kw.primary} Density</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -496,15 +481,17 @@ Ready to transform your marketing with AI? Start implementing these strategies t
                     <div>
                       <h4 className="font-medium text-gray-900 mb-2">Title:</h4>
                       <div className="bg-gray-50 p-3 rounded-lg">
-                        <p className="font-medium">{result.title}</p>
+                        <p className="font-medium">{result.title || "Untitled Blog"}</p>
                       </div>
                     </div>
 
                     <div>
                       <h4 className="font-medium text-gray-900 mb-2">Meta Description:</h4>
                       <div className="bg-gray-50 p-3 rounded-lg">
-                        <p className="text-sm">{result.metaDescription}</p>
-                        <div className="text-xs text-gray-500 mt-1">{result.metaDescription.length}/160 characters</div>
+                        <p className="text-sm">{result.metaDescription || "No meta description available."}</p>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {result.metaDescription ? result.metaDescription.length : 0}/160 characters
+                        </div>
                       </div>
                     </div>
 
@@ -513,16 +500,20 @@ Ready to transform your marketing with AI? Start implementing these strategies t
                       <div className="space-y-2">
                         <div>
                           <span className="text-sm text-gray-600">Primary: </span>
-                          <Badge className="bg-blue-100 text-blue-800">{result.keywords.primary}</Badge>
+                          <Badge className="bg-blue-100 text-blue-800">{result.keywords && result.keywords[0] ? result.keywords[0].primary : "N/A"}</Badge>
                         </div>
                         <div>
                           <span className="text-sm text-gray-600">Secondary: </span>
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {result.keywords.secondary.map((keyword, index) => (
-                              <Badge key={index} variant="secondary">
-                                {keyword}
-                              </Badge>
-                            ))}
+                            {result.keywords && result.keywords[0] && Array.isArray(result.keywords[0].secondary) && result.keywords[0].secondary.length > 0 ? (
+                              result.keywords[0].secondary.map((keyword: string, index: number) => (
+                                <Badge key={index} variant="secondary">
+                                  {keyword}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-gray-400">No secondary keywords</span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -540,14 +531,18 @@ Ready to transform your marketing with AI? Start implementing these strategies t
                   </CardHeader>
                   <CardContent>
                     <ol className="space-y-2">
-                      {result.outline.map((section, index) => (
-                        <li key={index} className="flex items-center gap-3">
-                          <span className="w-6 h-6 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-sm font-medium">
-                            {index + 1}
-                          </span>
-                          <span className="text-gray-700">{section}</span>
-                        </li>
-                      ))}
+                      {result.outline && Array.isArray(result.outline) && result.outline.length > 0 ? (
+                        result.outline.map((section, index) => (
+                          <li key={index} className="flex items-center gap-3">
+                            <span className="w-6 h-6 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-sm font-medium">
+                              {index + 1}
+                            </span>
+                            <span className="text-gray-700">{section}</span>
+                          </li>
+                        ))
+                      ) : (
+                        <li className="text-gray-400">No outline available.</li>
+                      )}
                     </ol>
                   </CardContent>
                 </Card>
@@ -567,7 +562,7 @@ Ready to transform your marketing with AI? Start implementing these strategies t
                   </CardHeader>
                   <CardContent>
                     <div className="bg-gray-50 p-4 rounded-lg max-h-96 overflow-y-auto">
-                      <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">{result.content}</pre>
+                      <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">{result.content || "No content available."}</pre>
                     </div>
                   </CardContent>
                 </Card>
@@ -581,24 +576,32 @@ Ready to transform your marketing with AI? Start implementing these strategies t
                     <div>
                       <h4 className="font-medium text-gray-900 mb-2">Improvements:</h4>
                       <ul className="space-y-1">
-                        {result.suggestions.improvements.map((improvement, index) => (
-                          <li key={index} className="text-sm text-gray-600 flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-500" />
-                            {improvement}
-                          </li>
-                        ))}
+                        {result.suggestions && Array.isArray(result.suggestions.improvements) && result.suggestions.improvements.length > 0 ? (
+                          result.suggestions.improvements.map((improvement, index) => (
+                            <li key={index} className="text-sm text-gray-600 flex items-center gap-2">
+                              <CheckCircle className="w-4 h-4 text-green-500" />
+                              {improvement}
+                            </li>
+                          ))
+                        ) : (
+                          <li className="text-gray-400">No improvements suggested.</li>
+                        )}
                       </ul>
                     </div>
 
                     <div>
                       <h4 className="font-medium text-gray-900 mb-2">Additional Sections to Consider:</h4>
                       <ul className="space-y-1">
-                        {result.suggestions.additionalSections.map((section, index) => (
-                          <li key={index} className="text-sm text-gray-600 flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4 text-blue-500" />
-                            {section}
-                          </li>
-                        ))}
+                        {result.suggestions && Array.isArray(result.suggestions.additionalSections) && result.suggestions.additionalSections.length > 0 ? (
+                          result.suggestions.additionalSections.map((section, index) => (
+                            <li key={index} className="text-sm text-gray-600 flex items-center gap-2">
+                              <CheckCircle className="w-4 h-4 text-blue-500" />
+                              {section}
+                            </li>
+                          ))
+                        ) : (
+                          <li className="text-gray-400">No additional sections suggested.</li>
+                        )}
                       </ul>
                     </div>
                   </CardContent>
@@ -610,9 +613,9 @@ Ready to transform your marketing with AI? Start implementing these strategies t
                     {copied ? <CheckCircle className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
                     {copied ? "Copied!" : "Copy Content"}
                   </Button>
-                  <Button variant="outline" className="flex-1 bg-transparent">
+                  <Button variant="outline" className="flex-1 bg-transparent" onClick={handleDownloadPDF}>
                     <Download className="w-4 h-4 mr-2" />
-                    Download as Word Doc
+                    Download as PDF
                   </Button>
                 </div>
               </div>

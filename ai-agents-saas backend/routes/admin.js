@@ -2,6 +2,8 @@ const express = require("express");
 const User = require("../models/User");
 const Subscription = require("../models/Subscription");
 const AIToolUsage = require("../models/AIToolUsage");
+const Settings = require("../models/Settings");
+const adminAuth = require("../middleware/adminAuth");
 
 const router = express.Router();
 
@@ -55,17 +57,17 @@ router.post("/login", async (req, res) => {
 // Get dashboard stats
 router.get("/dashboard-stats", async (req, res) => {
   try {
-    // Total users
+    // Total users (all users)
     const totalUsers = await User.countDocuments();
 
     // Monthly revenue (dummy, replace with real logic if you have payment data)
-    const monthlyRevenue = 45231;
+    const monthlyRevenue = 0;
 
     // Active subscriptions
     const activeSubscriptions = await Subscription.countDocuments({ status: "active" });
 
-    // API usage (dummy, replace with real logic if you track API usage)
-    const apiUsage = 12500;
+    // API usage (dynamic)
+    const apiUsage = await AIToolUsage.countDocuments();
 
     res.json({
       totalUsers,
@@ -123,6 +125,38 @@ router.get("/analytics", async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: "Error fetching analytics", error });
+  }
+});
+
+// Get all settings
+router.get("/settings", adminAuth, async (req, res) => {
+  try {
+    const settings = await Settings.findOne();
+    res.json(settings);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching settings", error });
+  }
+});
+
+// Update settings (admin only)
+router.put("/settings", adminAuth, async (req, res) => {
+  try {
+    const { platform, userManagement, aiTools } = req.body;
+    // Basic validation
+    if (!platform || typeof platform !== "object") {
+      return res.status(400).json({ message: "Invalid or missing platform settings" });
+    }
+    if (!userManagement || typeof userManagement !== "object") {
+      return res.status(400).json({ message: "Invalid or missing userManagement settings" });
+    }
+    if (!aiTools || typeof aiTools !== "object") {
+      return res.status(400).json({ message: "Invalid or missing aiTools settings" });
+    }
+    // Optionally, add more granular validation for subfields here
+    const updated = await Settings.findOneAndUpdate({}, req.body, { new: true, upsert: true });
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ message: "Error updating settings", error });
   }
 });
 

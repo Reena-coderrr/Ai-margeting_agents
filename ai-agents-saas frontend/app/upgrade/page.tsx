@@ -239,9 +239,6 @@ export default function UpgradePage() {
           </div>
 
           <div className="text-center mt-12">
-            <p className="text-gray-600 mb-4">
-              All plans include 24/7 support, regular updates, and a 30-day money-back guarantee.
-            </p>
             <Link href="/dashboard" className="text-purple-600 hover:underline">
               ← Back to Dashboard
             </Link>
