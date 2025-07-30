@@ -71,20 +71,13 @@ export function DashboardContent({ activeTab, profile }: { activeTab: string, pr
 
   return (
     <main className="flex-1 p-6">
-      <div className="mb-8 flex justify-between items-start">
+      <div className="mb-8">
         <div>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
             Welcome back, {profile.firstName}!
           </h2>
           <p className="text-gray-600">Here's your AI marketing dashboard.</p>
         </div>
-        <button 
-          onClick={refreshData} 
-          disabled={isRefreshing}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
-        </button>
       </div>
 
       {/* Plan Status */}

@@ -350,6 +350,73 @@ router.get("/test-auth", auth, async (req, res) => {
   }
 });
 
+// Contact form submission
+router.post("/contact", async (req, res) => {
+  try {
+    const { name, email, message } = req.body;
+    
+    // Validate required fields
+    if (!name || !email || !message) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+    
+    console.log('📧 Contact form submission:', { name, email, message });
+    
+    // Here you would integrate with your email service
+    // For now, we'll just log the message and return success
+    // You can integrate with services like:
+    // - Nodemailer with Gmail/SMTP
+    // - SendGrid
+    // - Mailgun
+    // - AWS SES
+    
+    // Example with nodemailer (you'll need to configure this)
+    /*
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransporter({
+      service: 'Gmail',
+      auth: {
+        user: 'your-email@gmail.com',
+        pass: 'your-app-password'
+      }
+    });
+    
+    await transporter.sendMail({
+      from: email,
+      to: 'sumit786rana@gmail.com',
+      subject: `Contact Form: ${name}`,
+      text: message,
+      html: `
+        <h3>New Contact Form Submission</h3>
+        <p><strong>Name:</strong> ${name}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Message:</strong></p>
+        <p>${message}</p>
+      `
+    });
+    */
+    
+    // For now, just return success
+    res.json({ 
+      message: "Message sent successfully! We'll get back to you soon.",
+      success: true 
+    });
+    
+  } catch (error) {
+    console.error('Contact form error:', error);
+    res.status(500).json({ 
+      message: "Failed to send message. Please try again later.",
+      success: false 
+    });
+  }
+});
+
 // @route   GET /api/user/notifications
 // @desc    Get notifications for the current user
 // @access  Private

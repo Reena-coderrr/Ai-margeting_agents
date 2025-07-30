@@ -5,15 +5,43 @@ import { Mail, Phone, MapPin, User } from "lucide-react";
 export default function ContactPage() {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
   const [submitted, setSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitted(true);
-    // Here you would send the form data to your backend or email service
+    setIsLoading(true);
+    setError("");
+    
+    try {
+      const response = await fetch("http://localhost:5000/api/user/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(form),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setSubmitted(true);
+        setForm({ name: "", email: "", message: "" }); // Clear form
+        console.log('✅ Contact form submitted successfully');
+      } else {
+        setError(data.message || "Failed to send message");
+        console.error('❌ Contact form error:', data.message);
+      }
+    } catch (error) {
+      setError("Network error. Please check your connection and try again.");
+      console.error('❌ Contact form network error:', error);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -70,11 +98,23 @@ export default function ContactPage() {
             </div>
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-lg font-semibold shadow hover:scale-105 hover:from-blue-700 hover:to-purple-700 transition-all duration-200"
-              disabled={submitted}
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-lg font-semibold shadow hover:scale-105 hover:from-blue-700 hover:to-purple-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={submitted || isLoading}
             >
-              {submitted ? "Message Sent!" : "Send Message"}
+              {isLoading ? "Sending..." : submitted ? "Message Sent!" : "Send Message"}
             </button>
+            
+            {error && (
+              <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                {error}
+              </div>
+            )}
+            
+            {submitted && (
+              <div className="mt-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-lg">
+                Thank you for your message! We'll get back to you soon.
+              </div>
+            )}
           </form>
         </div>
         {/* Contact Info & Map */}
@@ -83,15 +123,15 @@ export default function ContactPage() {
             <h2 className="text-2xl font-bold mb-4 text-blue-700">Contact Information</h2>
             <div className="flex items-center gap-3 mb-2">
               <MapPin className="text-blue-500" />
-              <span>123 AI Avenue, Tech City, 12345</span>
+              <span>Thind Market, Jhankat, Khatima, Udham Singh Nagar, 262308, Uttarakhand</span>
             </div>
             <div className="flex items-center gap-3 mb-2">
               <Mail className="text-blue-500" />
-              <a href="mailto:support@aimarketingagents.com" className="text-blue-700 underline">support@aimarketingagents.com</a>
+              <a href="mailto:sumit786rana@gmail.com" className="text-blue-700 underline">sumit786rana@gmail.com</a>
             </div>
             <div className="flex items-center gap-3">
               <Phone className="text-blue-500" />
-              <a href="tel:+1234567890" className="text-blue-700 underline">+1 (234) 567-890</a>
+              <a href="tel:+917500893874" className="text-blue-700 underline">+91 7500893874</a>
             </div>
           </div>
           <div className="bg-white/80 rounded-2xl shadow p-4 border border-blue-100">
@@ -99,7 +139,7 @@ export default function ContactPage() {
             <div className="w-full h-48 rounded-lg overflow-hidden shadow">
               <iframe
                 title="Our Location"
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3151.835434509374!2d144.9537363153169!3d-37.8162797797517!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6ad65d43f1f1f1f1%3A0x5045675218ce6e0!2sTech%20City!5e0!3m2!1sen!2sus!4v1680000000000!5m2!1sen!2sus"
+                src="https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=Khatima,Uttarakhand,India"
                 width="100%"
                 height="100%"
                 style={{ border: 0 }}
